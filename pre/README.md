@@ -1,5 +1,5 @@
-# Santization & Manual Pre-Processing \
-```from raw data to user_by_month & all_by_month```
+# Santization & Manual Pre-Processing 
+```from raw data to user_by_month & all_by_month``` \
 Modified: March 31st, 2021 \
 -- jeffmur
 
