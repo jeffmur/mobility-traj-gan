@@ -1,9 +1,7 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-import matplotlib.pyplot as plt
 import math
-import sys
 from src.lib import preprocess as pre
 
 
@@ -89,7 +87,6 @@ def create2DFreq(df, bounds, step, pix):
     # print("Entering FM")
 
     maxVal = 0
-    hasData = False
 
     for location in lonLat:
         # Difference between max Point (NE)

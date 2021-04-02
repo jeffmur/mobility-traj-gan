@@ -9,6 +9,7 @@ pandas = "*"
 tensorflow = "*"
 python-dotenv = "*"
 geopy = "*"
+matplotlib = "*"
 
 [dev-packages]
 pylint = "*"

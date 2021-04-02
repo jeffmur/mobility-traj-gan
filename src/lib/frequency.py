@@ -1,5 +1,3 @@
-from math import log10
-from PIL.Image import alpha_composite
 import pandas as pd
 import numpy as np
 from PIL import Image
@@ -75,7 +73,7 @@ def prodImage(bb, inFile, cell_size):
     -> returns Image (pixelX, pixelY)
     Representation (in black/white) of log dataframe
     """
-    pix, df = getFreqInMonth(bb, inFile, cell_size)
+    _, df = getFreqInMonth(bb, inFile, cell_size)
 
     return genFMprime(df)
 
