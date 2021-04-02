@@ -5,8 +5,29 @@ import pandas as pd
 import numpy as np
 from geopy.geocoders import Nominatim
 import math as m
+from datetime import datetime
 
 ## Raw Data Processing ##
+
+
+def unixToTimeStamp(df):
+    """
+    Convert Unix TimeStamp to Date, Time and append columns to dataframe
+
+    :returns: Dataframe w/ 'Date', 'Time' Columns and removes 'Unix'
+
+    :param: Dataframe w/ Unix Column Label
+    """
+    series = df.Unix[:]
+    uTD = [
+        datetime.utcfromtimestamp(int(ts)).strftime("%Y-%m-%d %H:%M:%S")
+        for ts in series
+    ]
+    df["Date"] = [i.split(" ", 1)[0] for i in uTD]
+    df["Time"] = [i.split(" ", 1)[1] for i in uTD]
+    df.drop(["Unix"], 1)
+
+    return df
 
 
 def removeSpaces(toRemove, toSave):
