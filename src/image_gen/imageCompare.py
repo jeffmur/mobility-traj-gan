@@ -1,7 +1,5 @@
 import pandas as pd
-import numpy as np
 import cv2
-
 from PIL import Image
 import skimage.metrics as ski
 

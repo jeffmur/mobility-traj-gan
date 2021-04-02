@@ -3,9 +3,6 @@ import numpy as np
 from PIL import Image
 import glob
 import os
-import sys
-
-sys.path.insert(1, "../")
 from src.lib import heatmap as hp
 
 
