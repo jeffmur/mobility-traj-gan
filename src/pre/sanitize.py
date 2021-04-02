@@ -8,21 +8,19 @@
 * Saves to csv
 """
 
-import preprocess as pre
-import pandas as pd
-import numpy as np
+from src.lib import preprocess as pre
 
 ## Paths : TO CHANGE FOR LOCAL SETUP ## TODO
 # raw gps.csv file in mdc
-rawGPS = 'PATH/FROM/gps-raw.csv'
-cleanGPS= 'PATH/TO/cleanGPS.csv' 
+rawGPS = "PATH/FROM/gps-raw.csv"
+cleanGPS = "PATH/TO/cleanGPS.csv"
 
 # raw records.csv file in mdc
-rawRecords = 'PATH/FROM/records-raw.csv'
-cleanRecords = 'PATH/TO/cleanRecords.csv'
+rawRecords = "PATH/FROM/records-raw.csv"
+cleanRecords = "PATH/TO/cleanRecords.csv"
 
 # records that only contain gps label (use grep) -- important
-gpsRecords = 'PATH/FROM/CLEANED/gps-ONLY-records.csv'
+gpsRecords = "PATH/FROM/CLEANED/gps-ONLY-records.csv"
 
 ## ------------------------------
 
@@ -30,17 +28,30 @@ gpsRecords = 'PATH/FROM/CLEANED/gps-ONLY-records.csv'
 pre.removeSpaces(rawGPS, cleanGPS)
 
 # Create Pandas Dataset
-headers = ['UID', 'Unix', 'Longitude', 'Latitude', 'Altitude', 'Speed', 'H. Accuracy', 'H. Dop', 'V. Accuracy', 'V. Dop', 'Speed Accuracy', 'Time_Since_Boot']
-gpsLong = pre.toPandas(cleanGPS, headers, ' ')
+headers = [
+    "UID",
+    "Unix",
+    "Longitude",
+    "Latitude",
+    "Altitude",
+    "Speed",
+    "H. Accuracy",
+    "H. Dop",
+    "V. Accuracy",
+    "V. Dop",
+    "Speed Accuracy",
+    "Time_Since_Boot",
+]
+gpsLong = pre.toPandas(cleanGPS, headers, " ")
 
-# Drop extra headers 
-newGPS = gpsLong[['UID', 'Unix', 'Latitude', 'Longitude']]
+# Drop extra headers
+newGPS = gpsLong[["UID", "Unix", "Latitude", "Longitude"]]
 
 # Convert Unix to Date, Time respectively
 gps = pre.unixToTimeStamp(newGPS)
 
 # # Then save
-gps.to_csv('cleanGPS.csv')
+gps.to_csv("cleanGPS.csv")
 
 """
 With the data cleaned, we can now decode Database keys for User IDs
@@ -53,7 +64,6 @@ pre.removeSpaces(rawRecords, cleanRecords)
 # --- Execute Before Continuing ---
 
 
-
 # headers = ['DB', 'UID', 'tz', 'time', 'type']
 # records = pre.toPandas(gpsRecords, headers, ' ')
 
@@ -64,7 +74,7 @@ pre.removeSpaces(rawRecords, cleanRecords)
 # for row in records.itertuples():
 #     KEY = row.DB
 #     VAL = row.UID
-    
+
 #     dictOfRecords[KEY] = VAL
 
 # replaceUID = gps['UID'].to_numpy()

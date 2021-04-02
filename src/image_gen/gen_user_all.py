@@ -12,33 +12,32 @@ import os
 from pathlib import Path
 import sys
 
-## TODO: THERE HAS TO BE A BETTER WAY
-sys.path.insert(1, '../')
-
-import lib.config as c
-import lib.preprocess as pre
-import lib.frequency as fre
-import lib.heatmap as hp
+from src.lib import config as c
+from src.lib import preprocess as pre
+from src.lib import frequency as fre
+from src.lib import heatmap as hp
 
 gpsHeader = c.datasetHeaders
 
-meters_size = 300 # sq meters
-CELL_SIZE = meters_size * 0.00062137 #sq miles
+meters_size = 300  # sq meters
+CELL_SIZE = meters_size * 0.00062137  # sq miles
 
 args = sys.argv
 
-if(len(args) <= 1):
+if len(args) <= 1:
     print(f"Usage: py3 gen_user_freq.py {c.DataInputDirectory}/USER_ID ")
     print("Usage: See dispatch.py")
     exit()
 
-outDir = c.DataOutputDirectory+'gps_{CELL_SIZE}_all/'
+outDir = c.DataOutputDirectory + "gps_{CELL_SIZE}_all/"
 p = Path(outDir)
 
-if(not (os.path.isdir(p))):
+if not (os.path.isdir(p)):
     p.mkdir()
 
-boundingBox = pre.fetchGeoLocation('Lausanne, District de Lausanne, Vaud, Switzerland')
+boundingBox = pre.fetchGeoLocation(
+    "Lausanne, District de Lausanne, Vaud, Switzerland"
+)
 
 for user in args[1:]:
     val = hp.parse4User(user)
