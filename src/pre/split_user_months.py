@@ -6,7 +6,7 @@ from src.lib import config
 
 # TODO: add header & combine split files
 
-directoryInput = config.DATA_INPUT_DIR
+input_dir = config.DATA_INPUT_DIR
 output_dir = config.DATA_OUTPUT_DIR
 gps_header = config.DATA_HEADERS
 
@@ -14,7 +14,7 @@ gps_header = config.DATA_HEADERS
 if not (os.path.isdir(output_dir)):
     output_dir.mkdir()
 
-all_files = glob.glob(directoryInput + "*")
+all_files = glob.glob(input_dir + "*")
 
 for path in all_files:
     print(path)

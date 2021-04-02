@@ -18,20 +18,20 @@ pyfile = args[1]
 totalUsers = 0
 totalFiles = 0
 # Get static ref of all users sorted by userID
-temp = glob.glob(c.DataInputDirectory + "/*")
+temp = glob.glob(c.DATA_INPUT_DIR + "/*")
 all_users = sorted(
     temp, key=lambda i: int(os.path.splitext(os.path.basename(i))[0])
 )
 
 monthPerUser = []
 
-for base, dirs, files in os.walk(c.DataInputDirectory):
+for base, dirs, files in os.walk(c.DATA_INPUT_DIR):
     # print('Searching in : ', base)
     c = 0
     for Files in files:
         c += 1
 
-    if base != c.DataInputDirectory:
+    if base != c.DATA_INPUT_DIR:
         baseName = int(base.split("/")[6])
         monthPerUser.append([baseName, c])
 
