@@ -6,7 +6,6 @@ WORKDIR /mobility/
 COPY src/requirements.txt /mobility/requirements.txt
 COPY lib/ lib/
 COPY pre/ pre/
-COPY image_gen/ image_gen/
 
 # Get & install necessary tools on image
 RUN apt-get update
