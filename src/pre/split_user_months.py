@@ -2,12 +2,13 @@ import pandas as pd
 import glob
 from pathlib import Path
 import os
+from src.lib import config
 
 # TODO: add header & combine split files
 
-directoryInput = "/home/jeffmur/dev/mdcd/mdcd_by_month/"
-output_dir = Path("/home/jeffmur/dev/mdcd/user_by_month")
-gps_header = ["UID", "Date", "Time", "Latitude", "Longitude"]
+directoryInput = config.DATA_INPUT_DIR
+output_dir = config.DATA_OUTPUT_DIR
+gps_header = config.DATA_HEADERS
 
 # Make dir if does NOT exist
 if not (os.path.isdir(output_dir)):
