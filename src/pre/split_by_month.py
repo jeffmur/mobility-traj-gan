@@ -1,7 +1,7 @@
 # Joshua Sterner
 # Modifed: Jeffrey Murray
 from pathlib import Path
-from src.lib import config
+import src.lib.config as config
 
 
 def split_trajectory(trajectory):

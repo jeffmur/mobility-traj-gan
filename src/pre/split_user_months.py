@@ -2,9 +2,7 @@ import pandas as pd
 import glob
 from pathlib import Path
 import os
-from src.lib import config
-
-# TODO: add header & combine split files
+import src.lib.config as config
 
 input_dir = config.DATA_INPUT_DIR
 output_dir = config.DATA_OUTPUT_DIR

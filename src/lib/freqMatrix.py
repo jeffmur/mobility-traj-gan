@@ -1,17 +1,21 @@
 import pandas as pd
 import matplotlib.pyplot as plt
-import seaborn as sns
 import math
-from src.lib import preprocess as pre
+import src.lib.preprocess as pre
+import numpy as np
 
 
 def setMap(boundingBox, cell_size):
     """
-    Create HeatMap Outline
+    Purpose: Create HeatMap Outline
 
-    df: DataFrame
+    @boundingBox: City or region limits to calculate grid dimensions in miles
+    @cell_size: in miles
 
-    cell_size: in miles
+    :returns: 
+    bounds: Lon, Lat coordinates {"SE", "SW", "NE", "NW"}
+    step: conversion between lat/lon with respect to cell_size (mi)
+    pix: returns image dimensions (frequency matrix columns and rows)
     """
 
     ## Calculate bounds
@@ -63,6 +67,13 @@ def create2DFreq(df, bounds, step, pix):
     """
     Frequency Matrix
     For every data point (lon, lat) within cell_size increment by 1
+    
+    @df: Dataframe['Longitude', 'Latitdue']
+    @bounds, step, pix: result of SetMap
+
+    :returns: 
+    maxVal: Highest tally value within matrix
+    freq_heat: Tallied results where columns are pix['width'] and rows are pix['length']
     """
 
     nLat = bounds["NE"][0]
@@ -82,37 +93,47 @@ def create2DFreq(df, bounds, step, pix):
         0, index=range(rows + 1), columns=range(columns + 1)
     )
 
+    exportList = []
+
     # Fixed issue of hardcoded index values
-    lonLat = [df.Longitude.to_numpy(), df.Longitude.to_numpy()]
+    latLon = df.to_numpy()
+    print(f'Total Length of input: {len(latLon)}')
     # print("Entering FM")
 
     maxVal = 0
 
-    for location in lonLat:
+    for location in latLon:
         # Difference between max Point (NE)
         # And Location (lonLat)
         # Within Frequency Matrix bounds
 
-        r = round((nLat - location[0]) / step_l)
+        r = round((nLat - location[4]) / step_l)
 
-        c = round((eLon - location[1]) / step_w)
+        c = round((eLon - location[5]) / step_w)
 
         if (c <= columns) and (c >= 0) and (r <= rows) and (r >= 0):
             freq_heat.loc[r, c] += 1
+            exportList.append( [ location[1], location[2], location[3], c, r ] )
 
             if maxVal < freq_heat.loc[r, c]:
                 maxVal = freq_heat.loc[r, c]
 
-    return maxVal, freq_heat
+    return maxVal, freq_heat, exportList
 
 
 def takeLog(maxVal, freq_heat):
+    """
+    For each row, normalize each data point
+    By their maximum values between 0 and 1
+
+    Uses log_base(maxVal, FM[i,j])
+
+    :returns: normalization approach
+    """
     shape = freq_heat.shape
     log_freq = pd.DataFrame(0, index=range(shape[0]), columns=range(shape[1]))
     if maxVal <= 1:
         return log_freq
-    """For each row, normalize each data point \n
-    By their maximum values between 0 and 1"""
 
     for row in freq_heat.itertuples():
         # Need row index for assignment
@@ -136,30 +157,6 @@ def takeLog(maxVal, freq_heat):
     # print("Calculated Logit")
 
     return log_freq
-
-
-def plotHeatMap(freqDF, title, cell_size):
-    """Show Heat Map \n
-    FreqDF: DataFrame which plots number of records at given cell\n
-    user: Name/UID \n
-    cell_size: size of cell within grid"""
-    ax = plt.axes()
-    sns.heatmap(freqDF, center=0, ax=ax)
-    plt.ylim(reversed(plt.ylim()))
-    ax.set_title(f"{title} w/ {cell_size} sq miles")
-    plt.show()
-
-
-def saveHeatMap(freqDF, title, path):
-    """Save Heat Map To PNG
-    FreqDF: DataFrame which plots number of records at given cell\n
-    user: Name/UID \n
-    cell_size: size of cell within grid"""
-
-    plt.figure(figsize=freqDF.shape)
-    sns.heatmap(freqDF, vmin=0, vmax=1, annot=True)
-    plt.savefig(f"{path}/{title}.png")
-
 
 # Ex. split_by_month_output/000/2008_10.csv
 def parse4Date(path):

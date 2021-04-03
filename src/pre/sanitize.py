@@ -8,7 +8,7 @@
 * Saves to csv
 """
 
-from src.lib import preprocess as pre
+import src.lib.preprocess as pre
 
 ## Paths : TO CHANGE FOR LOCAL SETUP ## TODO
 # raw gps.csv file in mdc

@@ -4,8 +4,8 @@ FROM tensorflow/tensorflow:latest-gpu-jupyter
 # Setup work directory & configuration files
 WORKDIR /mobility/
 COPY src/requirements.txt /mobility/requirements.txt
-COPY lib/ lib/
-COPY pre/ pre/
+COPY src/lib/ lib/
+COPY src/pre/ pre/
 
 # Get & install necessary tools on image
 RUN apt-get update
@@ -19,5 +19,9 @@ RUN apt-get install -y libgtk-3-dev libboost-python-dev
 RUN apt-get install -y python-dev python3-dev python3-pip
 RUN pip install --upgrade pip
 
+# When dependencies are finalized
+# RUN pip install -r requirements.txt
+
 # After successful build
+# Warning: Will be overridden with ANY parameters 
 CMD pip install -r requirements.txt
