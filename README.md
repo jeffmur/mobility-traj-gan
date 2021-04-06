@@ -14,3 +14,4 @@ environment with privacy preservation.
 | ---- | --------------------------------------- | --------- |
 | 3/31 | Created Repo; initalization & config.py | jeffmur   |
 | 4/1  | Project structure and importing fixes   | alexkyllo |
+| 4/5  | Optimize freqMatrix function            | alexkyllo |
