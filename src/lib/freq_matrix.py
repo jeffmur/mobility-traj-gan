@@ -5,7 +5,7 @@ import src.lib.preprocess as pre
 import numpy as np
 
 
-def setMap(boundingBox, cell_size):
+def set_map(bounding_box, cell_size):
     """
     Purpose: Create HeatMap Outline
 
@@ -19,31 +19,31 @@ def setMap(boundingBox, cell_size):
     """
 
     ## Calculate bounds
-    sLat = float(boundingBox[0])
-    nLat = float(boundingBox[1])
-    wLon = float(boundingBox[2])
-    eLon = float(boundingBox[3])
+    s_lat = float(bounding_box[0])
+    n_lat = float(bounding_box[1])
+    w_lon = float(bounding_box[2])
+    e_lon = float(bounding_box[3])
 
     # all four corners
-    SE = [sLat, eLon]
-    SW = [sLat, wLon]
-    NE = [nLat, eLon]
-    NW = [nLat, wLon]
+    SE = [s_lat, e_lon]
+    SW = [s_lat, w_lon]
+    NE = [n_lat, e_lon]
+    NW = [n_lat, w_lon]
 
     bounds = {"SE": SE, "SW": SW, "NE": NE, "NW": NW}
 
     ## Calculate Haversine Distance of bounds
     # SW -> NW
     # Width
-    dWest = pre.haversine_distance(SW[0], SW[1], NW[0], NW[1])
+    d_west = pre.haversine_distance(SW[0], SW[1], NW[0], NW[1])
 
     # NW -> NE
     # Length
-    dNorth = pre.haversine_distance(NW[0], NW[1], NE[0], NE[1])
+    d_north = pre.haversine_distance(NW[0], NW[1], NE[0], NE[1])
 
     # Round val to the nearest 1
-    length = math.ceil(dNorth)
-    width = math.ceil(dWest)
+    length = math.ceil(d_north)
+    width = math.ceil(d_west)
 
     # Image Dimensions
     l_pix = int(math.ceil(length / cell_size))
@@ -51,8 +51,8 @@ def setMap(boundingBox, cell_size):
 
     # Step Size for Lat/Lon comparison
     # Max distance / num of pixels
-    step_length = (nLat - sLat) / l_pix  #  Step Lenth
-    step_width = (eLon - wLon) / w_pix  #  Step Width
+    step_length = (n_lat - s_lat) / l_pix  #  Step Lenth
+    step_width = (e_lon - w_lon) / w_pix  #  Step Width
 
     # Steps in degrees
     step = {"width": step_width, "length": step_length}
@@ -63,7 +63,7 @@ def setMap(boundingBox, cell_size):
     return bounds, step, pix
 
 
-def create2DFreq(df, bounds, step, pix):
+def create_2d_freq(df, bounds, step, pix):
     """
     Frequency Matrix
     For every data point (lon, lat) within cell_size increment by 1
@@ -72,8 +72,9 @@ def create2DFreq(df, bounds, step, pix):
     @bounds, step, pix: result of SetMap
 
     :returns:
-    maxVal: Highest tally value within matrix
+    max_val: Highest tally value within matrix
     freq_heat: Tallied results where columns are pix['width'] and rows are pix['length']
+    export_list: The input data filtered and aggregated to cells
     """
 
     n_lat = bounds["NE"][0]
@@ -103,10 +104,10 @@ def create2DFreq(df, bounds, step, pix):
 
     max_val = freq_heat.max().max()
 
-    exportList = df.iloc[:, [0, 1, 2, 5, 6]]
-    exportList.columns = ["UID", "Date", "Time", "Row", "Column"]
+    export_list = df.iloc[:, [0, 1, 2, 5, 6]]
+    export_list.columns = ["UID", "Date", "Time", "Row", "Column"]
 
-    return max_val, freq_heat, exportList
+    return max_val, freq_heat, export_list
 
 
 def takeLog(maxVal, freq_heat):

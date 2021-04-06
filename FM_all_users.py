@@ -1,6 +1,6 @@
 from pathlib import Path
 import pandas as pd
-from src.lib import config, freqMatrix as FM, preprocess as pre
+from src.lib import config, freq_matrix as FM, preprocess as pre
 
 """
 Purpose: Generate Frequency Matrix for all users within a dataset
@@ -14,16 +14,16 @@ Output: cell_size (meters or miles)_all_users.csv
 """
 
 # HTTP request or set to static bounds
-boundingBox = pre.fetchGeoLocation("Lausanne, District de Lausanne, Vaud, Switzerland")
+bounding_box = pre.fetchGeoLocation("Lausanne, District de Lausanne, Vaud, Switzerland")
 # ['46.5043006', '46.6025773', '6.5838681', '6.7208137']
 
 # Data setup, modular cell_size for spatial resolution
 cell_size = config.CELL_SIZE_METERS * config.MILES_PER_METER  # meters * conversion to miles
-bounds, step, pix = FM.setMap(boundingBox, cell_size)
+bounds, step, pix = FM.set_map(bounding_box, cell_size)
 df = pd.read_csv(Path(config.DATA_INPUT_DIR) / config.DATA_INPUT_FILE, index_col=0)
 
 # Useful analytics + exportList
-maxVal, freq_heatmap, exportList = FM.create2DFreq(df, bounds, step, pix)
+maxVal, freq_heatmap, exportList = FM.create_2d_freq(df, bounds, step, pix)
 
 # Export List to CSV in OUTPUT DIR
 exportList[["UID", "Date", "Time", "Column", "Row"]].to_csv(
