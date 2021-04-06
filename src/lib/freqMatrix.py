@@ -12,7 +12,7 @@ def setMap(boundingBox, cell_size):
     @boundingBox: City or region limits to calculate grid dimensions in miles
     @cell_size: in miles
 
-    :returns: 
+    :returns:
     bounds: Lon, Lat coordinates {"SE", "SW", "NE", "NW"}
     step: conversion between lat/lon with respect to cell_size (mi)
     pix: returns image dimensions (frequency matrix columns and rows)
@@ -67,58 +67,46 @@ def create2DFreq(df, bounds, step, pix):
     """
     Frequency Matrix
     For every data point (lon, lat) within cell_size increment by 1
-    
+
     @df: Dataframe['Longitude', 'Latitdue']
     @bounds, step, pix: result of SetMap
 
-    :returns: 
+    :returns:
     maxVal: Highest tally value within matrix
     freq_heat: Tallied results where columns are pix['width'] and rows are pix['length']
     """
 
-    nLat = bounds["NE"][0]
-    eLon = bounds["NE"][1]
+    n_lat = bounds["NE"][0]
+    e_lon = bounds["NE"][1]
 
     columns = pix["width"]
     rows = pix["length"]
 
-    # print(f"{nLat} {eLon}")
-
-    print(f"{rows}, {columns}")
-
     step_w = step["width"]
     step_l = step["length"]
 
-    freq_heat = pd.DataFrame(
-        0, index=range(rows + 1), columns=range(columns + 1)
+    # Difference between max Point (NE)
+    # And Location (lonLat)
+    # Within Frequency Matrix bounds
+    df["r"] = np.round((n_lat - df.iloc[:, 3]) / step_l)
+    df["c"] = np.round((e_lon - df.iloc[:, 4]) / step_w)
+    df = df[(df.c <= columns) & (df.c >= 0) & (df.r <= rows) & (df.r >= 0)]
+
+    freq_heat = pd.pivot_table(
+        df[["UID", "r", "c"]],
+        values="UID",
+        index="r",
+        columns="c",
+        aggfunc="count",
+        fill_value=0,
     )
 
-    exportList = []
+    max_val = freq_heat.max().max()
 
-    # Fixed issue of hardcoded index values
-    latLon = df.to_numpy()
-    print(f'Total Length of input: {len(latLon)}')
-    # print("Entering FM")
+    exportList = df.iloc[:, [0, 1, 2, 5, 6]]
+    exportList.columns = ["UID", "Date", "Time", "Row", "Column"]
 
-    maxVal = 0
-
-    for location in latLon:
-        # Difference between max Point (NE)
-        # And Location (lonLat)
-        # Within Frequency Matrix bounds
-
-        r = round((nLat - location[4]) / step_l)
-
-        c = round((eLon - location[5]) / step_w)
-
-        if (c <= columns) and (c >= 0) and (r <= rows) and (r >= 0):
-            freq_heat.loc[r, c] += 1
-            exportList.append( [ location[1], location[2], location[3], c, r ] )
-
-            if maxVal < freq_heat.loc[r, c]:
-                maxVal = freq_heat.loc[r, c]
-
-    return maxVal, freq_heat, exportList
+    return max_val, freq_heat, exportList
 
 
 def takeLog(maxVal, freq_heat):
@@ -157,6 +145,7 @@ def takeLog(maxVal, freq_heat):
     # print("Calculated Logit")
 
     return log_freq
+
 
 # Ex. split_by_month_output/000/2008_10.csv
 def parse4Date(path):
