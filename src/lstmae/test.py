@@ -24,6 +24,7 @@ from tensorflow.keras.utils import plot_model
 from sklearn.metrics.cluster import normalized_mutual_info_score
 from sklearn.metrics import accuracy_score
 from sklearn.metrics.cluster import adjusted_rand_score
+from sklearn.cluster import KMeans
 
 # TODO: replace path hardcoding with configs
 processed_dir = "D:/0/data_processed"

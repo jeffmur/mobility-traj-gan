@@ -77,8 +77,7 @@ def create_2d_freq(df, bounds, step, pix):
     export_list: The input data filtered and aggregated to cells
     """
 
-    n_lat = bounds["NE"][0]
-    e_lon = bounds["NE"][1]
+    n_lat, e_lon = bounds["NE"]
 
     columns = pix["width"]
     rows = pix["length"]
