@@ -11,6 +11,8 @@ python-dotenv = "*"
 geopy = "*"
 matplotlib = "*"
 scikit-learn = "*"
+plotly = "*"
+nbformat = "*"
 
 [dev-packages]
 pylint = "*"
