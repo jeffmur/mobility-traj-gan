@@ -1,7 +1,7 @@
+tensorflow
+scikit-learn
 pandas
 numpy
-opencv_python
-Pillow
 matplotlib
 geopy
 python-dotenv

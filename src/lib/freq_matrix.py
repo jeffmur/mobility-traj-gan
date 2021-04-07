@@ -110,7 +110,7 @@ def create_2d_freq(df, bounds, step, pix):
     return max_val, freq_heat, export_list
 
 
-def takeLog(maxVal, freq_heat):
+def take_log(maxVal, freq_heat):
     """
     For each row, normalize each data point
     By their maximum values between 0 and 1

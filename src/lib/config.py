@@ -44,3 +44,9 @@ MILES_PER_METER = 0.00062137119
 """
 Distance unit conversion constant
 """
+
+FM_MATRIX = os.getenv("FM_MATRIX")
+"""
+Post processing pah in .env for output of FM_all_users.py
+( .csv file with all users and locations inside of Frequency Matrix )
+"""
