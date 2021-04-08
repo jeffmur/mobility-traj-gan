@@ -8,18 +8,17 @@ class LSTMAutoEncoder:
         optimizer,
         loss,
         n_subjects: int,
+        n_timesteps: int,
         n_features: int,
         lstm_units: int,
     ):
         """"""
         # Input tensor is ragged in the number of time steps
-        inputs = layers.Input(shape=(n_subjects, None, n_features), ragged=True)
+        inputs = layers.Input(shape=(n_subjects, n_timesteps, n_features))
         encoder = layers.LSTM(lstm_units)(inputs)
-        hidden = layers.RepeatVector(backend.shape(inputs)[1])(encoder)
+        hidden = layers.RepeatVector(n_timesteps)(encoder)
         decoder = layers.LSTM(lstm_units, return_sequences=True)(hidden)
-        outputs = layers.TimeDistributed(layers.Dense(n_subjects, n_features))(
-            decoder
-        )
+        outputs = layers.TimeDistributed(layers.Dense(n_subjects, n_features))(decoder)
         encoder_model = Model(inputs=inputs, outputs=outputs)
         encoder_model.compile(optimizer=optimizer, loss=loss)
         self.model = encoder_model
