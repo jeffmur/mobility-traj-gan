@@ -3,9 +3,7 @@ FROM tensorflow/tensorflow:latest-gpu-jupyter
 
 # Setup work directory & configuration files
 WORKDIR /mobility/
-COPY src/requirements.txt /mobility/requirements.txt
-COPY src/lib/ lib/
-COPY src/pre/ pre/
+COPY requirements.txt /mobility/requirements.txt
 
 # Get & install necessary tools on image
 RUN apt-get update
@@ -23,5 +21,5 @@ RUN pip install --upgrade pip
 # RUN pip install -r requirements.txt
 
 # After successful build
-# Warning: Will be overridden with ANY parameters 
+# Warning: Will be overridden with ANY parameters
 CMD pip install -r requirements.txt
