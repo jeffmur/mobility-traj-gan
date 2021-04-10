@@ -1,0 +1,17 @@
+name: mobility
+channels:
+  - pytorch
+  - conda-forge
+  - defaults
+dependencies:
+  - pylint
+  - tensorflow-gpu
+  - geopy
+  - plotly
+  - pandas
+  - scikit-learn
+  - matplotlib
+  - jupyter
+  - black
+  - numpy=1.19.5
+  - python-dotenv
