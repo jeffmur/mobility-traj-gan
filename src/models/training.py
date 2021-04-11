@@ -4,13 +4,16 @@ import pandas as pd
 import tensorflow as tf
 
 
-def preprocess_time(df, start_date, end_date, sample_resolution, pad_value=-1):
+def preprocess_time(df, start_date, end_date, sample_resolution, pad_value=0):
     """Preprocess the time dimension of the GPS time series.
     Filter window to start and end date, resample the time series
     and pad missing periods with sentinel value
     """
     df["DateTime"] = pd.to_datetime(df["Date"] + " " + df["Time"])
     df = df[(df["DateTime"] >= start_date) & (df["DateTime"] < end_date)]
+    # add 1 to positions so pad_value can be 0
+    df["Row"] = df["Row"] + 1
+    df["Column"] = df["Column"] + 1
     expanded_range = pd.date_range(
         start=start_date,
         end=end_date,
@@ -25,9 +28,9 @@ def preprocess_time(df, start_date, end_date, sample_resolution, pad_value=-1):
             lambda g: g.set_index("DateTime")
             .resample(sample_resolution)
             .first()[["Row", "Column"]]
-            .reindex(expanded_range, fill_value=-1)
+            .reindex(expanded_range, fill_value=pad_value)
         )
-    ).reset_index()
+    ).fillna(0).reset_index()
     return df
 
 
@@ -43,6 +46,8 @@ def train_lstm_ae():
     n_subjects = x["UID"].nunique()
     n_timesteps = x["DateTime"].nunique()
     n_features = 2
+    x["Row"] = x["Row"].astype(int)
+    x["Column"] = x["Column"].astype(int)
     x = x[["Row", "Column"]].values.reshape(
         (n_subjects, n_timesteps, n_features)
     )
@@ -50,14 +55,14 @@ def train_lstm_ae():
 
     model = LSTMAutoEncoder(
         optimizer="adam",
-        loss="mse",
+        loss="categorical_crossentropy",
         n_timesteps=n_timesteps,
         n_features=2,
         lstm_units=32,
     )
 
     # TODO:
-    history = model.fit(x, x, batch_size=64, epochs=20)
+    history = model.fit(x, x, batch_size=64, epochs=10, verbose=2)
     return history
 
 
