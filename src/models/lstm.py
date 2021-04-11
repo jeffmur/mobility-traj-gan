@@ -11,11 +11,13 @@ class LSTMAutoEncoder:
         lstm_units: int,
         mask_value: int = 0,
         activation="relu",
+        metrics=None,
     ):
         """"""
         # Input tensor is ragged in the number of time steps
         inputs = layers.Input(shape=(n_timesteps, n_features))
         masking = layers.Masking(mask_value=mask_value)(inputs)
+        # TODO: Decide whether to use Embedding or One-Hot encoding, or normalized raw GPS coordinates
         encoder = layers.LSTM(lstm_units, activation=activation)(masking)
         hidden = layers.RepeatVector(n_timesteps)(encoder)
         decoder = layers.LSTM(
@@ -25,7 +27,7 @@ class LSTMAutoEncoder:
             layers.Dense(n_features, activation="softmax")
         )(decoder)
         encoder_model = Model(inputs=inputs, outputs=outputs)
-        encoder_model.compile(optimizer=optimizer, loss=loss)
+        encoder_model.compile(optimizer=optimizer, loss=loss, metrics=metrics)
         self.model = encoder_model
 
     def fit(
@@ -35,6 +37,7 @@ class LSTMAutoEncoder:
         batch_size,
         epochs,
         initial_epoch=0,
+        validation_split=0.0,
         callbacks=None,
         verbose=2,
     ):
@@ -45,6 +48,7 @@ class LSTMAutoEncoder:
             batch_size=batch_size,
             epochs=epochs,
             initial_epoch=initial_epoch,
+            validation_split=validation_split,
             callbacks=callbacks,
             verbose=verbose,
         )

@@ -11,9 +11,7 @@ def preprocess_time(df, start_date, end_date, sample_resolution, pad_value=0):
     """
     df["DateTime"] = pd.to_datetime(df["Date"] + " " + df["Time"])
     df = df[(df["DateTime"] >= start_date) & (df["DateTime"] < end_date)]
-    # add 1 to positions so pad_value can be 0
-    df["Row"] = df["Row"] + 1
-    df["Column"] = df["Column"] + 1
+    df["Position"] = (df["Row"] * df["Column"].max()) + df["Column"] + 1
     expanded_range = pd.date_range(
         start=start_date,
         end=end_date,
@@ -22,15 +20,15 @@ def preprocess_time(df, start_date, end_date, sample_resolution, pad_value=0):
         name="DateTime",
     )
     df = (
-        df[["DateTime", "UID", "Row", "Column"]]
+        df[["DateTime", "UID", "Position"]]
         .groupby("UID")
         .apply(
             lambda g: g.set_index("DateTime")
             .resample(sample_resolution)
-            .first()[["Row", "Column"]]
+            .first()[["Position"]]
             .reindex(expanded_range, fill_value=pad_value)
         )
-    ).fillna(0).reset_index()
+    ).fillna(0).astype(int).reset_index()
     return df
 
 
@@ -45,10 +43,8 @@ def train_lstm_ae():
     )
     n_subjects = x["UID"].nunique()
     n_timesteps = x["DateTime"].nunique()
-    n_features = 2
-    x["Row"] = x["Row"].astype(int)
-    x["Column"] = x["Column"].astype(int)
-    x = x[["Row", "Column"]].values.reshape(
+    n_features = x.shape[1] - 2
+    x = x[["Position"]].values.reshape(
         (n_subjects, n_timesteps, n_features)
     )
     x = tf.convert_to_tensor(x)
@@ -57,14 +53,14 @@ def train_lstm_ae():
         optimizer="adam",
         loss="categorical_crossentropy",
         n_timesteps=n_timesteps,
-        n_features=2,
+        n_features=n_features,
         lstm_units=32,
     )
 
     # TODO:
-    history = model.fit(x, x, batch_size=64, epochs=10, verbose=2)
+    history = model.fit(x, x, batch_size=32, epochs=5)
     return history
 
 
 if __name__ == "__main__":
-    train_lstm_ae()
+    history = train_lstm_ae()
