@@ -28,7 +28,7 @@ def preprocess_time(df, start_date, end_date, sample_resolution, pad_value=0):
             .first()[["Position"]]
             .reindex(expanded_range, fill_value=pad_value)
         )
-    ).fillna(0).astype(int).reset_index()
+    ).fillna(0).reset_index()
     return df
 
 
@@ -44,21 +44,24 @@ def train_lstm_ae():
     n_subjects = x["UID"].nunique()
     n_timesteps = x["DateTime"].nunique()
     n_features = x.shape[1] - 2
+    n_feature_values = x["Position"].max()+1
     x = x[["Position"]].values.reshape(
         (n_subjects, n_timesteps, n_features)
     )
     x = tf.convert_to_tensor(x)
 
+    opt = tf.keras.optimizers.Adam(learning_rate=0.0001)
     model = LSTMAutoEncoder(
-        optimizer="adam",
-        loss="categorical_crossentropy",
+        optimizer=opt,
+        loss="sparse_categorical_crossentropy",
+        metrics=["sparse_categorical_accuracy"],
         n_timesteps=n_timesteps,
         n_features=n_features,
+        n_feature_values=n_feature_values,
         lstm_units=32,
     )
 
-    # TODO:
-    history = model.fit(x, x, batch_size=32, epochs=5)
+    history = model.fit(x, x, batch_size=32, epochs=200, validation_split=0.2)
     return history
 
 

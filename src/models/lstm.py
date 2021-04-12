@@ -8,9 +8,10 @@ class LSTMAutoEncoder:
         loss,
         n_timesteps: int,
         n_features: int,
+        n_feature_values: int,
         lstm_units: int,
         mask_value: int = 0,
-        activation="relu",
+        activation="tanh",
         metrics=None,
     ):
         """"""
@@ -18,13 +19,14 @@ class LSTMAutoEncoder:
         inputs = layers.Input(shape=(n_timesteps, n_features))
         masking = layers.Masking(mask_value=mask_value)(inputs)
         # TODO: Decide whether to use Embedding or One-Hot encoding, or normalized raw GPS coordinates
+        # TODO: Fix masking https://stackoverflow.com/a/47060797/1834892
         encoder = layers.LSTM(lstm_units, activation=activation)(masking)
         hidden = layers.RepeatVector(n_timesteps)(encoder)
         decoder = layers.LSTM(
             lstm_units, activation=activation, return_sequences=True
         )(hidden)
         outputs = layers.TimeDistributed(
-            layers.Dense(n_features, activation="softmax")
+            layers.Dense(n_feature_values, activation="softmax")
         )(decoder)
         encoder_model = Model(inputs=inputs, outputs=outputs)
         encoder_model.compile(optimizer=optimizer, loss=loss, metrics=metrics)
