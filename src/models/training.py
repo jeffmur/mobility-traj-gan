@@ -61,7 +61,7 @@ def train_lstm_ae():
         lstm_units=32,
     )
 
-    history = model.fit(x, x, batch_size=32, epochs=200, validation_split=0.2)
+    history = model.fit(x, x, batch_size=32, epochs=100, validation_split=0.2)
     return history
 
 
