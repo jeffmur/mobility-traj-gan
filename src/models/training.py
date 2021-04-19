@@ -7,7 +7,7 @@ import tensorflow as tf
 def preprocess_time(df, start_date, end_date, sample_resolution, pad_value=0):
     """Preprocess the time dimension of the GPS time series.
     Filter window to start and end date, resample the time series
-    and pad missing periods with sentinel value
+    and pad missing periods with sentinel value (default 0)
     """
     df["DateTime"] = pd.to_datetime(df["Date"] + " " + df["Time"])
     df = df[(df["DateTime"] >= start_date) & (df["DateTime"] < end_date)]
@@ -28,7 +28,8 @@ def preprocess_time(df, start_date, end_date, sample_resolution, pad_value=0):
             .first()[["Position"]]
             .reindex(expanded_range, fill_value=pad_value)
         )
-    ).fillna(0).reset_index()
+    ).fillna(pad_value).reset_index()
+    df["Position"] = df["Position"].astype(int)
     return df
 
 
@@ -59,10 +60,12 @@ def train_lstm_ae():
         n_features=n_features,
         n_feature_values=n_feature_values,
         lstm_units=32,
+        embedding_length=32,
     )
 
     history = model.fit(x, x, batch_size=32, epochs=100, validation_split=0.2)
     return history
+
 
 
 if __name__ == "__main__":

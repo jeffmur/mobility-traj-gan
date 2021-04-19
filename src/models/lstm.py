@@ -28,16 +28,23 @@ class LSTMAutoEncoder:
         n_timesteps: int,
         n_features: int,
         n_feature_values: int,
+        embedding_length: int,
         lstm_units: int,
-        mask_value: int = 0,
         activation="tanh",
         metrics=None,
     ):
         """"""
-        # Input tensor is ragged in the number of time steps
         inputs = layers.Input(shape=(n_timesteps, n_features))
-        masking = layers.Masking(mask_value=mask_value)(inputs)
-        encoder = LSTMBottleneck(lstm_units, n_timesteps)(masking)
+        embedding = layers.Embedding(
+            n_feature_values,
+            embedding_length,
+            input_length=n_timesteps,
+            mask_zero=True,
+        )(inputs)
+        # TODO: Flatten or concatenate the embeddings?
+        # masking = layers.Masking(mask_value=mask_value)(inputs)
+        # encoder = LSTMBottleneck(lstm_units, n_timesteps)(masking)
+        encoder = LSTMBottleneck(lstm_units, n_timesteps)(embedding)
         decoder = layers.LSTM(
             lstm_units, activation=activation, return_sequences=True
         )(encoder)
