@@ -26,7 +26,6 @@ class LSTMAutoEncoder:
         optimizer,
         loss,
         n_timesteps: int,
-        n_features: int,
         n_feature_values: int,
         embedding_length: int,
         lstm_units: int,
@@ -34,7 +33,7 @@ class LSTMAutoEncoder:
         metrics=None,
     ):
         """"""
-        inputs = layers.Input(shape=(n_timesteps, n_features))
+        inputs = layers.Input(shape=(n_timesteps,))
         embedding = layers.Embedding(
             n_feature_values,
             embedding_length,
@@ -44,10 +43,17 @@ class LSTMAutoEncoder:
         # TODO: Flatten or concatenate the embeddings?
         # masking = layers.Masking(mask_value=mask_value)(inputs)
         # encoder = LSTMBottleneck(lstm_units, n_timesteps)(masking)
-        encoder = LSTMBottleneck(lstm_units, n_timesteps)(embedding)
+        # encoder = LSTMBottleneck(
+
+        encoder = layers.LSTM(lstm_units, input_shape=(n_timesteps, 1))(
+            embedding
+        )
+        hidden = layers.RepeatVector(n_timesteps)(encoder)
         decoder = layers.LSTM(
-            lstm_units, activation=activation, return_sequences=True
-        )(encoder)
+            lstm_units,
+            activation=activation,
+            return_sequences=True,
+        )(hidden)
         outputs = layers.TimeDistributed(
             layers.Dense(n_feature_values, activation="softmax")
         )(decoder)
