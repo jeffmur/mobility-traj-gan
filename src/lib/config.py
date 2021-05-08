@@ -30,7 +30,9 @@ DATASET = os.getenv("DATASET")
 Name of the dataset we are processing. Could be "GeoLife", "MDC", etc.
 """
 
-DATA_HEADERS = {"MDC": ["Index", "UID", "Date", "Time", "Latitude", "Longitude"]}.get(DATASET)
+DATA_HEADERS = {"MDC": ["Index", "UID", "Date", "Time", "Latitude", "Longitude"]}.get(
+    DATASET
+)
 """
 Path to parsed dataset / (mdc || geoLife || privamov || etc.) /user_by_month/ included
 """
@@ -49,4 +51,9 @@ FM_MATRIX = os.getenv("FM_MATRIX")
 """
 Post processing pah in .env for output of FM_all_users.py
 ( .csv file with all users and locations inside of Frequency Matrix )
+"""
+
+GPS_BB = os.getenv("GPS_BB")
+"""
+Path to the file with raw GPS coordinates but filtered to bounding box region
 """

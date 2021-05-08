@@ -109,6 +109,24 @@ def create_2d_freq(df, bounds, step, pix):
     return max_val, freq_heat, export_list
 
 
+def filter_bounds(df, bounds):
+    """
+    Filter the trajectory points to those lying within the rectangular map area.
+    """
+    n_lat, e_lon = bounds["NE"]
+    s_lat, w_lon = bounds["SW"]
+
+    ns = (
+        (df.iloc[:, 4] >= w_lon) | (df.iloc[:, 4] <= e_lon)
+        if e_lon < w_lon
+        else (df.iloc[:, 4] >= w_lon) & (df.iloc[:, 4] <= e_lon)
+    )
+
+    ew = (df.iloc[:, 3] >= s_lat) & (df.iloc[:, 3] <= n_lat)
+
+    return df[ns & ew]
+
+
 def take_log(maxVal, freq_heat):
     """
     For each row, normalize each data point

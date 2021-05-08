@@ -40,7 +40,6 @@ class LSTMAutoEncoder:
             input_length=n_timesteps,
             mask_zero=True,
         )(inputs)
-        # TODO: Flatten or concatenate the embeddings?
         # masking = layers.Masking(mask_value=mask_value)(inputs)
         # encoder = LSTMBottleneck(lstm_units, n_timesteps)(masking)
         # encoder = LSTMBottleneck(

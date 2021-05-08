@@ -64,21 +64,27 @@ def rowcol_to_1d(df):
     return df
 
 
-def prep_data_sessions():
+def prep_data_sessions(maxlen_ntile=0.5):
     """Prep mobility sequence session data"""
     x = pd.read_csv(config.FM_MATRIX, index_col=0)
     x = merge_datetime(x)
     x = rowcol_to_1d(x)
     x = split_gaps(x)
     # get indexes
-    idxs = [list(v.values) for v in x.groupby(["UID", "Gap"]).groups.values() if len(v.values) > 1]
+    idxs = [
+        list(v.values)
+        for v in x.groupby(["UID", "Gap"]).groups.values()
+        if len(v.values) > 1
+    ]
     x_sessions = [x.iloc[i] for i in idxs]
     x_nested = [s.Position.tolist() for s in x_sessions]
     # get 90th percentile sequence length
     x_lengths = sorted([len(l) for l in x_nested])
-    pct_idx = round(len(x_lengths) * 0.9)
+    pct_idx = round(len(x_lengths) * 0.5)
     maxlen = x_lengths[pct_idx]
-    x_pad = pad_sequences(x_nested, maxlen=maxlen, padding="pre", truncating="pre", value=0)
+    x_pad = pad_sequences(
+        x_nested, maxlen=maxlen, padding="pre", truncating="pre", value=0
+    )
     x_enc = OrdinalEncoder().fit_transform(x_pad)
     return x_enc
 
@@ -90,6 +96,7 @@ def train_lstm_ae_seq():
     n_timesteps = x.shape[1]
     x = tf.convert_to_tensor(x)
     opt = tf.keras.optimizers.Adam(learning_rate=0.0001)
+    # opt = tf.keras.optimizers.Adam(learning_rate=0.005, beta_1=0.1, beta_2=0.001, amsgrad=True)
     model = LSTMAutoEncoder(
         optimizer=opt,
         loss="sparse_categorical_crossentropy",
@@ -116,7 +123,9 @@ def train_lstm_ae():
         sample_resolution="1min",
     )
     x_idx, x_test_idx = next(
-        GroupShuffleSplit(test_size=0.2, n_splits=2, random_state=7).split(x, groups=x["UID"])
+        GroupShuffleSplit(test_size=0.2, n_splits=2, random_state=7).split(
+            x, groups=x["UID"]
+        )
     )
     x = x.iloc[x_idx]
     n_subjects = x["UID"].nunique()
@@ -144,4 +153,7 @@ def train_lstm_ae():
 
 
 if __name__ == "__main__":
-    history = train_lstm_ae()
+    import os
+
+    os.chdir("../..")
+    x = prep_data_sessions()
