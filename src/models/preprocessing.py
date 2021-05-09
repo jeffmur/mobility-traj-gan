@@ -25,15 +25,11 @@ def _get_grid(cell_size: float) -> pd.DataFrame:
     df = pd.read_csv(Path(config.DATA_INPUT_DIR) / config.DATA_INPUT_FILE, index_col=0)
 
     _, _, df = freq_matrix.create_2d_freq(df, bounds, step, pix)
-
-    # Export List to CSV in OUTPUT DIR
-    df[["UID", "Date", "Time", "Column", "Row"]].to_csv(
-        Path(config.DATA_OUTPUT_DIR) / f"{config.CELL_SIZE_METERS}m_all_users.csv"
-    )
+    df["DateTime"] = pd.to_datetime(df["Date"] + " " + df["Time"])
+    return df[["UID", "DateTime", "Column", "Row"]]
 
 
 def get_trajectory_samples(
-    df: pd.DataFrame,
     cell_size: float,
     start_date: pd.Timestamp,
     end_date: pd.Timestamp,
@@ -44,8 +40,6 @@ def get_trajectory_samples(
     """
     Parameters
     ----------
-    df: pandas.DataFrame
-        A DataFrame returned by `get_grid`
     cell_size: float
         The width of a square cell in miles
     start_date: pandas.Timestamp
@@ -62,7 +56,6 @@ def get_trajectory_samples(
         The value to fill / pad missing periods in the time series.
     """
     df = _get_grid(cell_size)
-    df["DateTime"] = pd.to_datetime(df["Date"] + " " + df["Time"])
     df = df[(df["DateTime"] >= start_date) & (df["DateTime"] < end_date)]
     df["Position"] = (df["Row"] * df["Column"].max()) + df["Column"] + 1
     expanded_range = pd.date_range(
