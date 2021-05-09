@@ -4,28 +4,28 @@ import dotenv
 
 dotenv.load_dotenv()
 
-DATA_INPUT_DIR = os.getenv("DATA_INPUT_DIR")
+DATA_INPUT_DIR = str(os.getenv("DATA_INPUT_DIR"))
 """
 Note: Used with os.walk which assumes it is a directory (hence no trailing backslash)
 Important: This is the RAW dataset (not santized or preprocessed)
 """
 
-DATA_INPUT_FILE = os.getenv("DATA_INPUT_FILE")
+DATA_INPUT_FILE = str(os.getenv("DATA_INPUT_FILE"))
 """
 Input data filename, if a single CSV file (not a dir)
 """
 
-DATA_OUTPUT_DIR = os.getenv("DATA_OUTPUT_DIR")
+DATA_OUTPUT_DIR = str(os.getenv("DATA_OUTPUT_DIR"))
 """
 Used for exporting data (as images or csvs)
 """
 
-GIT_PATH = os.getenv("GIT_PATH")
+GIT_PATH = str(os.getenv("GIT_PATH"))
 """
 Project Directory
 """
 
-DATASET = os.getenv("DATASET")
+DATASET = str(os.getenv("DATASET"))
 """
 Name of the dataset we are processing. Could be "GeoLife", "MDC", etc.
 """
