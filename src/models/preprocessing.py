@@ -25,7 +25,6 @@ def _get_grid(cell_size: float) -> pd.DataFrame:
 
     bounds, step, pix = freq_matrix.set_map(bounding_box, cell_size)
     df = pd.read_csv(Path(config.DATA_INPUT_DIR) / config.DATA_INPUT_FILE, index_col=0)
-n
     _, _, df = freq_matrix.create_2d_freq(df, bounds, step, pix)
     df["DateTime"] = pd.to_datetime(df["Date"] + " " + df["Time"])
     return df[["UID", "DateTime", "Column", "Row"]]
@@ -168,29 +167,42 @@ def std_gps():
 
 def split_weeks(df):
     """Split the GPS data into user-week trajectories."""
-    df["hour"] = df["datetime"].dt.hour
-    df["weekday"] = df["datetime"].dt.weekday
     df["year"] = df["datetime"].dt.year
+    df["month"] = df["datetime"].dt.month
+    df["day"] = df["datetime"].dt.day
+    df["weekday"] = df["datetime"].dt.weekday
+    df["hour"] = df["datetime"].dt.hour
+    df["minute"] = df["datetime"].dt.minute
     df["week"] = df["datetime"].dt.isocalendar().week
     df["tid"] = df.groupby(["uid", "year", "week"]).ngroup()
-    df = df.groupby(["tid", "uid", "weekday", "hour"]).agg(
-        {"lat_dist_scaled": "mean", "lon_dist_scaled": "mean"}
-    ).reset_index()
+    df = (
+        df.groupby(["tid", "year", "month", "day", "weekday", "hour", "minute", "uid"])
+        .agg({"lat_dist_scaled": "mean", "lon_dist_scaled": "mean"})
+        .reset_index()
+    )
     return df
 
 
-def std_gps_to_tensor(df):
+def std_gps_to_tensor(df, max_len_qtile=0.95):
     """transform trajectories DataFrame to a NumPy tensor"""
     tid_groups = df.groupby("tid").groups
     tid_dfs = [df.iloc[g] for g in tid_groups.values()]
     y = np.array([tdf.uid.min() for tdf in tid_dfs])
-    # get 96th percentile sequence length
+    # get percentile of sequence length
     x_lengths = sorted([len(l) for l in tid_dfs])
-    pct_idx = round(len(x_lengths) * 0.95)
+    pct_idx = round(len(x_lengths) * max_len_qtile)
     maxlen = x_lengths[pct_idx]
-    x_nested = [tdf[["lat_dist_scaled", "lon_dist_scaled", "weekday", "hour"]].to_numpy() for tdf in tid_dfs]
-    x_pad = pad_sequences(x_nested, maxlen=maxlen, padding="pre", truncating="pre", value=0., dtype=float)
+    x_nested = [
+        tdf[["lat_dist_scaled", "lon_dist_scaled", "weekday", "hour"]].to_numpy() for tdf in tid_dfs
+    ]
+    x_pad = pad_sequences(
+        x_nested, maxlen=maxlen, padding="pre", truncating="pre", value=0.0, dtype=float
+    )
     return x_pad, y
+
+
+def tensor_to_gps(x, centroid_lat, centroid_lon, max_lat, max_lon, min_lat, min_lon):
+    """Convert the tensor representation back to a data frame of GPS records."""
 
 
 def label_user_gaps(df, max_gap="60min"):
