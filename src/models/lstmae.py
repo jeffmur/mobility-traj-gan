@@ -1,4 +1,6 @@
-from tensorflow.keras import layers, Model
+"""models/lstmae.py
+"""
+from tensorflow.keras import Model, layers
 
 
 class LSTMAutoEncoder:
@@ -24,9 +26,9 @@ class LSTMAutoEncoder:
             return_sequences=True,
         )(hidden)
         decoder_2 = layers.LSTM(lstm_units, return_sequences=True)(decoder_1)
-        outputs = layers.TimeDistributed(
-            layers.Dense(n_feature_values, activation="softmax")
-        )(decoder_2)
+        outputs = layers.TimeDistributed(layers.Dense(n_feature_values, activation="softmax"))(
+            decoder_2
+        )
         encoder_model = Model(inputs=inputs, outputs=outputs)
         encoder_model.compile(optimizer=optimizer, loss=loss, metrics=metrics)
         self.model = encoder_model

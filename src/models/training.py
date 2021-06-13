@@ -1,10 +1,12 @@
+#%load_ext autoreload
+#%autoreload 2
 import numpy as np
 import pandas as pd
 import tensorflow as tf
 from sklearn.model_selection import GroupShuffleSplit
 from src.lib import config
+from src.models.lstmae import LSTMAutoEncoder
 from src.models.preprocessing import get_trajectory_samples, prep_gps
-from src.models.lstm import LSTMAutoEncoder
 
 
 def train_lstm_ae_seq(lstm_units, epochs, batch_size, learning_rate):
@@ -37,18 +39,14 @@ def train_lstm_ae_seq(lstm_units, epochs, batch_size, learning_rate):
         metrics=["sparse_categorical_accuracy"],
     )
 
-    history = model.fit(
-        x, x, batch_size=batch_size, epochs=epochs, validation_split=0.2, verbose=1
-    )
+    history = model.fit(x, x, batch_size=batch_size, epochs=epochs, validation_split=0.2, verbose=1)
     return history
 
 
 def train_lstmae_gps():
     x = prep_gps()
     x_idx, x_test_idx = next(
-        GroupShuffleSplit(test_size=0.2, n_splits=2, random_state=7).split(
-            x, groups=x["UID"]
-        )
+        GroupShuffleSplit(test_size=0.2, n_splits=2, random_state=7).split(x, groups=x["UID"])
     )
     x = x.iloc[x_idx]
     n_trajectories = x[["UID", "i"]].drop_duplicates()["UID"].count()
@@ -58,9 +56,7 @@ def train_lstmae_gps():
 
     opt = tf.keras.optimizers.Adam(learning_rate=0.0001)
     model = tf.keras.Sequential()
-    model.add(
-        tf.keras.layers.LSTM(512, input_shape=(n_timesteps, 2), return_sequences=True)
-    )
+    model.add(tf.keras.layers.LSTM(512, input_shape=(n_timesteps, 2), return_sequences=True))
     model.add(tf.keras.layers.LSTM(512, return_sequences=True))
     model.add(tf.keras.layers.TimeDistributed(tf.keras.layers.Dense(2)))
     model.compile(optimizer=opt, loss="mse", metrics=["mean_squared_error"])
@@ -90,9 +86,7 @@ def train_lstm_ae(epochs: int, batch_size: int = 64, learning_rate: float = 0.00
 
     opt = tf.keras.optimizers.Adam(learning_rate=learning_rate)
     model = tf.keras.Sequential()
-    model.add(
-        tf.keras.layers.LSTM(512, input_shape=(n_timesteps, 1), return_sequences=True)
-    )
+    model.add(tf.keras.layers.LSTM(512, input_shape=(n_timesteps, 1), return_sequences=True))
     model.add(tf.keras.layers.LSTM(256, return_sequences=True))
     model.add(tf.keras.layers.LSTM(256, return_sequences=True))
     model.add(tf.keras.layers.LSTM(512, return_sequences=True))
@@ -106,9 +100,7 @@ def train_lstm_ae(epochs: int, batch_size: int = 64, learning_rate: float = 0.00
         loss="sparse_categorical_crossentropy",
         metrics=["sparse_categorical_accuracy"],
     )
-    history = model.fit(
-        x, x, batch_size=batch_size, epochs=epochs, verbose=1, validation_split=0.2
-    )
+    history = model.fit(x, x, batch_size=batch_size, epochs=epochs, verbose=1, validation_split=0.1)
     return history
 
 
