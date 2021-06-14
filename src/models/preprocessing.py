@@ -5,7 +5,6 @@ import pandas as pd
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import MinMaxScaler, OrdinalEncoder
 from src.lib import config, freq_matrix, preprocess
-from src.models.lstm import LSTMAutoEncoder
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.utils import to_categorical
 
@@ -232,6 +231,13 @@ def scale_gps(df):
 
 def gps_to_tensor(df, max_len_qtile=0.95):
     """transform trajectories DataFrame to a NumPy tensor"""
+    weekday_cat = pd.DataFrame(
+        to_categorical(df["weekday"], num_classes=7), columns=[f"weekday_{i}" for i in range(0, 7)]
+    )
+    hour_cat = pd.DataFrame(
+        to_categorical(df["hour"], num_classes=24), columns=[f"hour_{i}" for i in range(0, 24)]
+    )
+    df = pd.concat([df.drop(["weekday", "hour"], axis=1), weekday_cat, hour_cat], axis=1)
     tid_groups = df.groupby("tid").groups
     tid_dfs = [df.iloc[g] for g in tid_groups.values()]
     # UID is a label, split it into a separate vector
@@ -240,13 +246,10 @@ def gps_to_tensor(df, max_len_qtile=0.95):
     x_lengths = sorted([len(l) for l in tid_dfs])
     pct_idx = round(len(x_lengths) * max_len_qtile)
     maxlen = x_lengths[pct_idx]
-    x_nested = [tdf[["lat", "lon", "weekday", "hour"]].to_numpy() for tdf in tid_dfs]
+    x_nested = [tdf.iloc[:, 2:].to_numpy() for tdf in tid_dfs]
     x_pad = pad_sequences(
         x_nested, maxlen=maxlen, padding="pre", truncating="pre", value=0.0, dtype=float
     )
-    weekday_cat = to_categorical(x_pad[:, :, 2:3], num_classes=7)
-    hour_cat = to_categorical(x_pad[:, :, 3:4], num_classes=24)
-    x_pad = np.concatenate([x_pad[:, :, 0:2], weekday_cat, hour_cat], axis=2)
     return x_pad, uids
 
 
