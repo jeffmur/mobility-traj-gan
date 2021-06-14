@@ -7,6 +7,7 @@ from sklearn.preprocessing import MinMaxScaler, OrdinalEncoder
 from src.lib import config, freq_matrix, preprocess
 from src.models.lstm import LSTMAutoEncoder
 from tensorflow.keras.preprocessing.sequence import pad_sequences
+from tensorflow.keras.utils import to_categorical
 
 
 def _get_grid(cell_size: float) -> pd.DataFrame:
@@ -147,64 +148,6 @@ def prep_gps():
     return x
 
 
-def std_gps():
-    """Prepare GPS data with standardized distance from a centroid."""
-    df = pd.read_csv(config.GPS_BB)
-    df.columns = ["uid", "date", "time", "lat", "lon"]
-    df["datetime"] = pd.to_datetime(df["date"] + " " + df["time"])
-    df = df.sort_values(["uid", "datetime"])
-    kmeans = KMeans(n_clusters=1).fit(df[["lat", "lon"]])
-    centr_lat, centr_lon = kmeans.cluster_centers_[0]
-    df["lat_dist"] = df["lat"] - centr_lat
-    df["lon_dist"] = df["lon"] - centr_lon
-    scaler = MinMaxScaler().fit(df[["lat_dist", "lon_dist"]])
-    df.loc[:, ["lat_dist_scaled", "lon_dist_scaled"]] = scaler.transform(
-        df[["lat_dist", "lon_dist"]]
-    )
-    df = df[["uid", "datetime", "lat_dist_scaled", "lon_dist_scaled"]]
-    return df, list(kmeans.cluster_centers_[0]), (list(scaler.data_max_), list(scaler.data_min_))
-
-
-def split_weeks(df):
-    """Split the GPS data into user-week trajectories."""
-    df["year"] = df["datetime"].dt.year
-    df["month"] = df["datetime"].dt.month
-    df["day"] = df["datetime"].dt.day
-    df["weekday"] = df["datetime"].dt.weekday
-    df["hour"] = df["datetime"].dt.hour
-    df["minute"] = df["datetime"].dt.minute
-    df["week"] = df["datetime"].dt.isocalendar().week
-    df["tid"] = df.groupby(["uid", "year", "week"]).ngroup()
-    df = (
-        df.groupby(["tid", "year", "month", "day", "weekday", "hour", "minute", "uid"])
-        .agg({"lat_dist_scaled": "mean", "lon_dist_scaled": "mean"})
-        .reset_index()
-    )
-    return df
-
-
-def std_gps_to_tensor(df, max_len_qtile=0.95):
-    """transform trajectories DataFrame to a NumPy tensor"""
-    tid_groups = df.groupby("tid").groups
-    tid_dfs = [df.iloc[g] for g in tid_groups.values()]
-    y = np.array([tdf.uid.min() for tdf in tid_dfs])
-    # get percentile of sequence length
-    x_lengths = sorted([len(l) for l in tid_dfs])
-    pct_idx = round(len(x_lengths) * max_len_qtile)
-    maxlen = x_lengths[pct_idx]
-    x_nested = [
-        tdf[["lat_dist_scaled", "lon_dist_scaled", "weekday", "hour"]].to_numpy() for tdf in tid_dfs
-    ]
-    x_pad = pad_sequences(
-        x_nested, maxlen=maxlen, padding="pre", truncating="pre", value=0.0, dtype=float
-    )
-    return x_pad, y
-
-
-def tensor_to_gps(x, centroid_lat, centroid_lon, max_lat, max_lon, min_lat, min_lon):
-    """Convert the tensor representation back to a data frame of GPS records."""
-
-
 def label_user_gaps(df, max_gap="60min"):
     df["Gap"] = (df["DateTime"].diff() > max_gap).astype(int).cumsum()
     return df
@@ -245,3 +188,84 @@ def prep_data_sessions(maxlen_ntile=0.5):
     x_pad = pad_sequences(x_nested, maxlen=maxlen, padding="pre", truncating="pre", value=0)
     x_enc = OrdinalEncoder().fit_transform(x_pad)
     return x_enc
+
+
+def get_gps_traj(min_points=2):
+    """Split the GPS data into user-week trajectories at 10 minute resolution."""
+    df = pd.read_csv(config.GPS_BB)
+    df.columns = ["uid", "date", "time", "lat", "lon"]
+    df["datetime"] = pd.to_datetime(df["date"] + " " + df["time"])
+    df = df.sort_values(["uid", "datetime"])
+    df["year"] = df["datetime"].dt.year
+    df["month"] = df["datetime"].dt.month
+    df["day"] = df["datetime"].dt.day
+    df["weekday"] = df["datetime"].dt.weekday
+    df["hour"] = df["datetime"].dt.hour
+    df["minute"] = df["datetime"].dt.minute
+    df["week"] = df["datetime"].dt.isocalendar().week
+    df["tenminute"] = (df["datetime"].dt.minute // 10 * 10).astype(int)
+    df = (
+        df.groupby(["uid", "year", "month", "week", "day", "weekday", "hour", "tenminute"])
+        .agg({"lat": "mean", "lon": "mean"})
+        .reset_index()
+    )
+    # filter out trajectories with fewer than min points
+    df = df.groupby(["uid", "year", "week"]).filter(lambda x: len(x) >= min_points).reset_index()
+    df["tid"] = df.groupby(["uid", "year", "week"]).ngroup()
+    return df[["uid", "tid", "lat", "lon", "weekday", "hour"]]
+
+
+def scale_gps(df):
+    """Prepare GPS data with standardized distance from a centroid."""
+    df1 = df.copy()
+    kmeans = KMeans(n_clusters=1).fit(df1[["lat", "lon"]])
+    centr_lat, centr_lon = kmeans.cluster_centers_[0]
+    df1.loc[:, "lat"] = df1["lat"] - centr_lat
+    df1.loc[:, "lon"] = df1["lon"] - centr_lon
+    scaler = MinMaxScaler().fit(df1[["lat", "lon"]])
+    df1.loc[:, ["lat", "lon"]] = scaler.transform(df1[["lat", "lon"]])
+    return df1, kmeans, scaler
+
+
+def gps_to_tensor(df, max_len_qtile=0.95):
+    """transform trajectories DataFrame to a NumPy tensor"""
+    tid_groups = df.groupby("tid").groups
+    tid_dfs = [df.iloc[g] for g in tid_groups.values()]
+    # UID is a label, split it into a separate vector
+    uids = np.array([tdf.uid.values[0] for tdf in tid_dfs])
+    # get percentile of sequence length
+    x_lengths = sorted([len(l) for l in tid_dfs])
+    pct_idx = round(len(x_lengths) * max_len_qtile)
+    maxlen = x_lengths[pct_idx]
+    x_nested = [tdf[["lat", "lon", "weekday", "hour"]].to_numpy() for tdf in tid_dfs]
+    x_pad = pad_sequences(
+        x_nested, maxlen=maxlen, padding="pre", truncating="pre", value=0.0, dtype=float
+    )
+    weekday_cat = to_categorical(x_pad[:, :, 2:3])
+    hour_cat = to_categorical(x_pad[:, :, 3:4])
+    x_pad = np.concatenate([x_pad[:, :, 0:2], weekday_cat, hour_cat], axis=2)
+    return x_pad, uids
+
+
+def tensor_to_gps(x, uids, kmeans, scaler):
+    """Convert the tensor representation back to a data frame of GPS records."""
+    tids = np.repeat(np.expand_dims(np.arange(0, x.shape[0]), axis=1), x.shape[1], axis=1).reshape(
+        x.shape[0] * x.shape[1]
+    )
+    # tids = np.repeat(np.expand_dims(tids, axis=1), x.shape[1], axis=1).reshape(
+    #     x.shape[0] * x.shape[1]
+    # )
+    uids = np.repeat(np.expand_dims(uids, axis=1), x.shape[1], axis=1).reshape(
+        x.shape[0] * x.shape[1]
+    )
+    x_res = np.reshape(x, (x.shape[0] * x.shape[1], x.shape[2]))
+    df = pd.DataFrame(x_res)
+    df["tid"] = tids
+    df["uid"] = uids
+    df = df[df[0] + df[1] != 0.0].reset_index()
+    df.loc[:, ["lat", "lon"]] = scaler.inverse_transform(df[[0, 1]])
+    df["lat"] = df["lat"] + kmeans.cluster_centers_[0][0]
+    df["lon"] = df["lon"] + kmeans.cluster_centers_[0][1]
+    df["weekday"] = df[list(range(2, 9))].idxmax(axis=1) - 2
+    df["hour"] = df[list(range(9, 33))].idxmax(axis=1) - 9
+    return df[["uid", "tid", "lat", "lon", "weekday", "hour"]]
