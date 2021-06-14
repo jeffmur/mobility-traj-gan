@@ -190,6 +190,9 @@ def prep_data_sessions(maxlen_ntile=0.5):
     return x_enc
 
 
+# Preprocessing code for comparison with TrajGAN approach
+
+
 def get_gps_traj(min_points=2):
     """Split the GPS data into user-week trajectories at 10 minute resolution."""
     df = pd.read_csv(config.GPS_BB)
@@ -241,8 +244,8 @@ def gps_to_tensor(df, max_len_qtile=0.95):
     x_pad = pad_sequences(
         x_nested, maxlen=maxlen, padding="pre", truncating="pre", value=0.0, dtype=float
     )
-    weekday_cat = to_categorical(x_pad[:, :, 2:3])
-    hour_cat = to_categorical(x_pad[:, :, 3:4])
+    weekday_cat = to_categorical(x_pad[:, :, 2:3], num_classes=7)
+    hour_cat = to_categorical(x_pad[:, :, 3:4], num_classes=24)
     x_pad = np.concatenate([x_pad[:, :, 0:2], weekday_cat, hour_cat], axis=2)
     return x_pad, uids
 
