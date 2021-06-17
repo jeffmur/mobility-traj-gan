@@ -229,7 +229,7 @@ def scale_gps(df):
     return df1, kmeans, scaler
 
 
-def gps_to_tensor(df, max_len_qtile=0.95):
+def gps_to_tensor(df, max_len_qtile=0.95, padding="post"):
     """transform trajectories DataFrame to a NumPy tensor"""
     weekday_cat = pd.DataFrame(
         to_categorical(df["weekday"], num_classes=7), columns=[f"weekday_{i}" for i in range(0, 7)]
@@ -248,7 +248,7 @@ def gps_to_tensor(df, max_len_qtile=0.95):
     maxlen = x_lengths[pct_idx]
     x_nested = [tdf.iloc[:, 2:].to_numpy() for tdf in tid_dfs]
     x_pad = pad_sequences(
-        x_nested, maxlen=maxlen, padding="pre", truncating="pre", value=0.0, dtype=float
+        x_nested, maxlen=maxlen, padding=padding, truncating=padding, value=0.0, dtype=float
     )
     return x_pad, uids
 
