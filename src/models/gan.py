@@ -244,12 +244,14 @@ def train(
             # "one-sided label smoothing": use 0.9 instead of 1 as real labels
             # gen_labels = np.full((batch_size, 1), 0.9)
             noise = np.random.normal(0, 1, (x.shape[0], latent_dim))
-            # TODO: get the shapes right for loss function calculation
-            gen_loss = gan.train_on_batch([*x_split, noise], [gen_labels, *x_split])
+            gen_loss = gan.train_on_batch(
+                [*x_split, noise], [gen_labels, *x_split], return_dict=True
+            )
+            print(f"gen_loss: {gen_loss}")
             print(
                 " ".join(
                     f"""Epoch {i}/{epochs}, Batch {j}/{n_batches}, dis_loss={dis_loss:.3f},
-                    dis_acc={dis_acc:.2f}, gen_loss={gen_loss:.3f}
+                    dis_acc={dis_acc:.2f}, gen_loss={gen_loss}
                     """.splitlines()
                 ),
                 end="\r",
