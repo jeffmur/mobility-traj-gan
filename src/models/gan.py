@@ -9,8 +9,7 @@ from datetime import datetime
 import numpy as np
 import pandas as pd
 import tensorflow as tf
-from tensorflow.keras import (Model, initializers, layers, losses, optimizers,
-                              regularizers, utils)
+from tensorflow.keras import Model, initializers, layers, losses, optimizers, regularizers, utils
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 
 SEED = 11
@@ -21,7 +20,7 @@ def build_inputs_latlon(timesteps, dense_units):
     i = layers.Input(shape=(timesteps, 2), name="input_latlon")
     # TODO: check that masking is being propagated to the losses.
     mask = layers.Masking()(i)
-    unstacked = layers.Lambda(lambda x: tf.unstack(x, axis=1))(mask)
+    unstacked = layers.Lambda(lambda x: tf.unstack(x, axis=1), mask)(mask)
     d = layers.Dense(
         units=dense_units,
         activation="relu",
@@ -63,6 +62,7 @@ def build_inputs(
         inputs.append(cat_input)
         embeddings.append(cat_embed)
     concat_input = layers.Concatenate(axis=2)(embeddings)
+    masking_fn = lambda _, prev_mask: tf.unstack(prev_mask, axis=1)
     unstacked = layers.Lambda(lambda x: tf.unstack(x, axis=1))(concat_input)
     d = layers.Dense(
         units=concat_dense_units,
@@ -322,7 +322,7 @@ def run():
     x = x[0 : (len(vocab_sizes) + 1)]
     # Padding zero to reach the maxlength
     x = np.concatenate(
-        [pad_sequences(f, timesteps, padding="post", dtype="float64") for f in x], axis=2
+        [pad_sequences(f, timesteps, padding="pre", dtype="float64") for f in x], axis=2
     )
 
     n = x.shape[0]
@@ -331,5 +331,5 @@ def run():
     valid_n = np.ceil(n * valid_split).astype(int)
     valid_idx, train_idx = idx[:valid_n], idx[valid_n:]
     x_train, x_valid = x[train_idx, :], x[valid_idx, :]
-    train(exp_name, gen, dis, gan, x_train, x_valid, vocab_sizes, epochs=200)
+    train(exp_name, gen, dis, gan, x_train, x_valid, vocab_sizes, epochs=50)
     return gen, dis, gan
