@@ -16,7 +16,7 @@ from tensorflow.keras.preprocessing.sequence import pad_sequences
 SEED = 11
 
 # Masked Loss from LSTM-TrajGAN
-def traj_loss(real_traj, gen_traj, mask, vocab_sizes, latlon_weight=10.0):
+def traj_loss(real_traj, gen_traj, mask, latlon_weight=10.0):
     """Novel trajectory loss from LSTM-TrajGAN paper"""
     traj_length = K.sum(mask, axis=1)
     masked_latlon_full = K.sum(
@@ -32,7 +32,7 @@ def traj_loss(real_traj, gen_traj, mask, vocab_sizes, latlon_weight=10.0):
     )
     masked_latlon_mse = K.sum(tf.math.divide(masked_latlon_full, traj_length))
     cat_losses = []
-    for idx in range(1, len(vocab_sizes) + 1):
+    for idx in range(1, len(real_traj)):
         ce_loss = tf.compat.v1.nn.softmax_cross_entropy_with_logits_v2(
             real_traj[idx], gen_traj[idx]
         )
@@ -41,6 +41,7 @@ def traj_loss(real_traj, gen_traj, mask, vocab_sizes, latlon_weight=10.0):
         cat_losses.append(ce_mean)
 
     total_loss = masked_latlon_mse * latlon_weight + K.sum(cat_losses)
+
     return total_loss
 
 
@@ -203,15 +204,21 @@ def build_gan(
     dis.trainable = False
 
     # The trajectory generator takes real trajectories and noise as inputs
-    inputs = [layers.Input(shape=(timesteps, 2), name="input_latlon")]
-    for key, val in vocab_sizes.items():
-        inputs.append(layers.Input(shape=(timesteps, val), name="input_" + key))
-    inputs.append(layers.Input(shape=(latent_dim,), name="input_noise"))
-    inputs.append(layers.Input(shape=(timesteps, 1), name="input_mask"))
+    # inputs = [layers.Input(shape=(timesteps, 2), name="input_latlon")]
+    # for key, val in vocab_sizes.items():
+    #     inputs.append(layers.Input(shape=(timesteps, val), name="input_" + key))
+    # inputs.append(layers.Input(shape=(latent_dim,), name="input_noise"))
+    # inputs.append(layers.Input(shape=(timesteps, 1), name="input_mask"))
+    # gen_trajs = gen(inputs)
+    # y_pred = dis(gen_trajs[:-1])
+    # mask = inputs[-1]
+    # gan = Model(inputs, y_pred)
+    # gan.add_loss(traj_loss(inputs[:-2], gen_trajs[:-1], mask))
+    ##
     y_pred = dis(gen.outputs[:-1])
     gan = Model(gen.inputs, y_pred)
     mask = gen.inputs[-1]
-    gan.add_loss(traj_loss(gen.inputs[:-2], gen.outputs[:-1], mask, vocab_sizes))
+    gan.add_loss(traj_loss(gen.inputs[:-2], gen.outputs[:-1], mask))
     gan.compile(optimizer=optimizer, loss="binary_crossentropy")
     return gen, dis, gan
 
@@ -299,9 +306,7 @@ def train(
             noise = np.random.normal(0, 1, (this_batch_size * 2, latent_dim))
             gen_inputs = x_split
             gen_inputs.insert(-1, noise)
-            gen_loss = gan.train_on_batch(
-                gen_inputs, [gen_labels, *x_split[:-2]], return_dict=True
-            )["loss"]
+            gen_loss = gan.train_on_batch(gen_inputs, gen_labels, return_dict=True)["loss"]
             print(
                 " ".join(
                     f"""Epoch {i}/{epochs}, Batch {j}/{n_batches}, dis_loss={dis_loss:.3f},
