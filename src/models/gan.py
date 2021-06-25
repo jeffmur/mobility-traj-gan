@@ -18,35 +18,30 @@ SEED = 11
 # Masked Loss from LSTM-TrajGAN
 def traj_loss(real_traj, gen_traj, mask, vocab_sizes, latlon_weight=10):
     """Novel trajectory loss from LSTM-TrajGAN paper"""
-
-    def loss(y_true, y_pred):
-        traj_length = K.sum(mask, axis=1)
-        bce_loss = losses.binary_crossentropy(y_true, y_pred)
-        masked_latlon_full = K.sum(
-            K.sum(
-                tf.multiply(
-                    tf.multiply((gen_traj[0] - real_traj[0]), (gen_traj[0] - real_traj[0])),
-                    tf.concat([mask for x in range(2)], 2),
-                ),
-                axis=1,
+    traj_length = K.sum(mask, axis=1)
+    masked_latlon_full = K.sum(
+        K.sum(
+            tf.multiply(
+                tf.multiply((gen_traj[0] - real_traj[0]), (gen_traj[0] - real_traj[0])),
+                tf.concat([mask for x in range(2)], 2),
             ),
             axis=1,
-            keepdims=True,
+        ),
+        axis=1,
+        keepdims=True,
+    )
+    masked_latlon_mse = K.sum(tf.math.divide(masked_latlon_full, traj_length))
+    cat_losses = []
+    for idx in range(1, len(vocab_sizes) + 1):
+        ce_loss = tf.compat.v1.nn.softmax_cross_entropy_with_logits_v2(
+            gen_traj[idx], real_traj[idx]
         )
-        masked_latlon_mse = K.sum(tf.math.divide(masked_latlon_full, traj_length))
-        cat_losses = []
-        for idx in range(1, len(vocab_sizes) + 1):
-            ce_loss = tf.compat.v1.nn.softmax_cross_entropy_with_logits_v2(
-                gen_traj[idx], real_traj[idx]
-            )
-            ce_loss_masked = tf.multiply(ce_loss, K.sum(mask, axis=2))
-            ce_mean = K.sum(tf.math.divide(ce_loss_masked, traj_length))
-            cat_losses.append(ce_mean)
+        ce_loss_masked = tf.multiply(ce_loss, K.sum(mask, axis=2))
+        ce_mean = K.sum(tf.math.divide(ce_loss_masked, traj_length))
+        cat_losses.append(ce_mean)
 
-        total_loss = bce_loss + masked_latlon_mse * latlon_weight + K.sum(cat_losses)
-        return total_loss
-
-    return loss
+    total_loss = masked_latlon_mse * latlon_weight + K.sum(cat_losses)
+    return total_loss
 
 
 def build_inputs_latlon(timesteps, dense_units):
@@ -213,17 +208,11 @@ def build_gan(
         inputs.append(layers.Input(shape=(timesteps, val), name="input_" + key))
     inputs.append(layers.Input(shape=(latent_dim,), name="input_noise"))
     inputs.append(layers.Input(shape=(timesteps, 1), name="input_mask"))
-
-    # The trajectory generator generates synthetic trajectories
-    gen_trajs = gen(inputs)
-
-    pred = dis(gen_trajs[:-1])  # discriminator does not take the mask as input
-    gan = Model(inputs, pred)
-    mask = inputs[-1]
-    gan.compile(
-        optimizer=optimizer,
-        loss=traj_loss(inputs[:-2], gen_trajs[:-1], inputs[-1], vocab_sizes),
-    )
+    y_pred = dis(gen.outputs[:-1])
+    gan = Model(gen.inputs, y_pred)
+    mask = gen.inputs[-1]
+    gan.add_loss(traj_loss(gen.inputs[:-2], gen.outputs[:-1], mask, vocab_sizes))
+    gan.compile(optimizer=optimizer, loss="binary_crossentropy")
     return gen, dis, gan
 
 
