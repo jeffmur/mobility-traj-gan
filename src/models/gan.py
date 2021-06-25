@@ -48,8 +48,7 @@ def traj_loss(real_traj, gen_traj, mask, latlon_weight=10.0):
 def build_inputs_latlon(timesteps, dense_units):
     """Build input layers for lat-lon features."""
     i = layers.Input(shape=(timesteps, 2), name="input_latlon")
-    mask = layers.Masking()(i)
-    unstacked = layers.Lambda(lambda x: tf.unstack(x, axis=1), mask)(mask)
+    unstacked = layers.Lambda(lambda x: tf.unstack(x, axis=1))(i)
     d = layers.Dense(
         units=dense_units,
         activation="relu",
@@ -65,8 +64,7 @@ def build_inputs_latlon(timesteps, dense_units):
 def build_inputs_cat(timesteps, levels, feature_name):
     """Build input layers for categorical features."""
     i = layers.Input(shape=(timesteps, levels), name=f"input_{feature_name}")
-    mask = layers.Masking()(i)
-    unstacked = layers.Lambda(lambda x: tf.unstack(x, axis=1))(mask)
+    unstacked = layers.Lambda(lambda x: tf.unstack(x, axis=1))(i)
     d = layers.Dense(
         units=levels,
         activation="relu",
@@ -287,25 +285,28 @@ def train(
             gen_inputs = x_split
             gen_inputs.insert(-1, noise)
             x_fake = np.concatenate(gen.predict(gen_inputs)[:-1], axis=2)
+            x_fake_split = split_inputs(x_fake, vocab_sizes)
             y_fake = np.zeros((this_batch_size, 1))
-            # shuffle the real and synthetic examples together, removing the mask
-            x = np.vstack((x_real[:, :, :-1], x_fake))
-            y = np.vstack((y_real, y_fake))
-            idx_shuf = np.random.permutation(x.shape[0])
-            x = x[idx_shuf]
-            y = y[idx_shuf]
-            x_split = split_inputs(x, vocab_sizes)
             # train the discriminator
-            dis_res = dis.train_on_batch(x_split[:-1], y, return_dict=True)
-            dis_loss = dis_res["loss"]
-            dis_acc = dis_res["accuracy"]
+            dis_loss_real, dis_acc_real = dis.train_on_batch(x_split[:-2], y_real)
+            dis_loss_fake, dis_acc_fake = dis.train_on_batch(x_fake_split[:-1], y_fake)
+            dis_loss = 0.5 * np.add(dis_loss_real, dis_loss_fake)
+            dis_acc = 0.5 * np.add(dis_acc_real, dis_acc_fake)
+            # shuffle the real and synthetic examples together, removing the mask
+            # x = np.vstack((x_real[:, :, :-1], x_fake))
+            # y = np.vstack((y_real, y_fake))
+            # idx_shuf = np.random.permutation(x.shape[0])
+            # x = x[idx_shuf]
+            # y = y[idx_shuf]
+            # x_split = split_inputs(x, vocab_sizes)
+            # train the discriminator
+            # dis_res = dis.train_on_batch(x_split[:-1], y, return_dict=True)
+            # dis_loss = dis_res["loss"]
+            # dis_acc = dis_res["accuracy"]
             # train the combined model
-            gen_labels = np.ones((this_batch_size * 2, 1))
+            gen_labels = np.ones((this_batch_size, 1))
             # "one-sided label smoothing": use 0.9 instead of 1 as real labels
             # gen_labels = np.full((batch_size, 1), 0.9)
-            noise = np.random.normal(0, 1, (this_batch_size * 2, latent_dim))
-            gen_inputs = x_split
-            gen_inputs.insert(-1, noise)
             gen_loss = gan.train_on_batch(gen_inputs, gen_labels, return_dict=True)["loss"]
             print(
                 " ".join(
@@ -394,4 +395,5 @@ def run():
 
 
 if __name__ == "__main__":
-    run()
+    pass
+    #    run()
