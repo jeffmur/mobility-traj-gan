@@ -284,25 +284,13 @@ def train(
             # pass generations (dropping input mask) to discriminator
             gen_inputs = x_split
             gen_inputs.insert(-1, noise)
-            x_fake = np.concatenate(gen.predict(gen_inputs)[:-1], axis=2)
-            x_fake_split = split_inputs(x_fake, vocab_sizes)
+            x_fake_split = gen.predict(gen_inputs)
             y_fake = np.zeros((this_batch_size, 1))
             # train the discriminator
             dis_loss_real, dis_acc_real = dis.train_on_batch(x_split[:-2], y_real)
             dis_loss_fake, dis_acc_fake = dis.train_on_batch(x_fake_split[:-1], y_fake)
             dis_loss = 0.5 * np.add(dis_loss_real, dis_loss_fake)
             dis_acc = 0.5 * np.add(dis_acc_real, dis_acc_fake)
-            # shuffle the real and synthetic examples together, removing the mask
-            # x = np.vstack((x_real[:, :, :-1], x_fake))
-            # y = np.vstack((y_real, y_fake))
-            # idx_shuf = np.random.permutation(x.shape[0])
-            # x = x[idx_shuf]
-            # y = y[idx_shuf]
-            # x_split = split_inputs(x, vocab_sizes)
-            # train the discriminator
-            # dis_res = dis.train_on_batch(x_split[:-1], y, return_dict=True)
-            # dis_loss = dis_res["loss"]
-            # dis_acc = dis_res["accuracy"]
             # train the combined model
             gen_labels = np.ones((this_batch_size, 1))
             # "one-sided label smoothing": use 0.9 instead of 1 as real labels
@@ -318,49 +306,50 @@ def train(
             )
         print()
         # validation at end of epoch
-        # y_val_real = np.ones((x_valid.shape[0], 1))
-        # y_val_fake = np.zeros((x_valid.shape[0], 1))
-        # x_val_split = split_inputs(x_valid, vocab_sizes)
-        # noise = np.random.normal(0, 1, (x_valid.shape[0], latent_dim))
-        # gen_input = [*x_val_split, noise]
-        # gen_val_labels = np.ones((x_valid.shape[0], 1))
-        # gen_val_loss = gan.evaluate(gen_input, [gen_val_labels, *x_val_split], return_dict=True)[
-        #     "loss"
-        # ]
-        # x_val_fake = gen.predict(gen_input)
-        # dis_val_r_loss, dis_valid_r_acc = dis.evaluate(x_val_split, y_val_real)
-        # dis_valid_f_loss, dis_valid_f_acc = dis.evaluate(x_val_fake, y_val_fake)
-        # print(
-        #     " ".join(
-        #         f"""Experiment {exp_name} epoch{i:04d}
-        #         G val loss: {gen_val_loss:.3f}
-        #         D val loss real: {dis_val_r_loss:.3f} fake: {dis_valid_f_loss:.3f}
-        #         D val accuracy real: {dis_valid_r_acc:.2f}, fake: {dis_valid_f_acc:.2f}""".splitlines()
-        #     )
-        # )
-        # # TODO: add logging
-        # # TODO: add early stopping
-        # if i % save_interval == 0:
-        #     gen.save(f"experiments/{exp_name}/{start_time}/{i:04d}")
-        # rounding = 3
-        # # log learning curves to a CSV file.
-        # write_csv(
-        #     exp_name,
-        #     start_time,
-        #     i,
-        #     val_discriminator_accuracy_real=round(dis_valid_r_acc, rounding),
-        #     val_discriminator_loss_real=round(dis_val_r_loss, rounding),
-        #     val_discriminator_accuracy_fake=round(dis_valid_f_acc, rounding),
-        #     val_discriminator_loss_fake=round(dis_valid_f_loss, rounding),
-        # )
+        y_val_real = np.ones((x_valid.shape[0], 1))
+        y_val_fake = np.zeros((x_valid.shape[0], 1))
+        x_val_split = split_inputs(x_valid, vocab_sizes)
+        noise = np.random.normal(0, 1, (x_valid.shape[0], latent_dim))
+        gen_val_input = x_val_split
+        gen_val_input.insert(-1, noise)
+        gen_val_labels = np.ones((x_valid.shape[0], 1))
+        gen_val_loss = gan.evaluate(gen_val_input, gen_val_labels, return_dict=True)["loss"]
+        x_val_fake = gen.predict(gen_val_input)
+        dis_val_r_loss, dis_val_r_acc = dis.evaluate(x_val_split[:-2], y_val_real)
+        dis_val_f_loss, dis_val_f_acc = dis.evaluate(x_val_fake[:-1], y_val_fake)
+        print(
+            " ".join(
+                f"""Experiment {exp_name} epoch{i:04d}
+                G val loss: {gen_val_loss:.3f}
+                D val loss real: {dis_val_r_loss:.3f} fake: {dis_val_f_loss:.3f}
+                D val accuracy real: {dis_val_r_acc:.2f}, fake: {dis_val_f_acc:.2f}""".splitlines()
+            )
+        )
+        # TODO: add logging
+        # TODO: add early stopping
+        if i % save_interval == 0:
+            gen.save(f"experiments/{exp_name}/{start_time}/{i:04d}")
+        rounding = 3
+        # log learning curves to a CSV file.
+        write_csv(
+            exp_name,
+            start_time,
+            i,
+            val_gen_loss=round(gen_val_loss, rounding),
+            val_dis_acc_real=round(dis_val_r_acc, rounding),
+            val_dis_loss_real=round(dis_val_r_loss, rounding),
+            val_dis_acc_fake=round(dis_val_f_acc, rounding),
+            val_dis_loss_fake=round(dis_val_f_loss, rounding),
+        )
 
 
 def run():
     """Run an experiment with a given set of hyperparameters."""
-    exp_name = "000"
+    exp_name = "trajgan_000"
     os.makedirs(f"experiments/{exp_name}", exist_ok=True)
     optimizer = optimizers.Adam(0.001, 0.5)
     timesteps = 144
+    epochs = 200
     vocab_sizes = {"day": 7, "hour": 24, "category": 10}
     gen, dis, gan = build_gan(optimizer, timesteps, vocab_sizes)
     # from CSV
@@ -390,10 +379,9 @@ def run():
     valid_n = np.ceil(n * valid_split).astype(int)
     valid_idx, train_idx = idx[:valid_n], idx[valid_n:]
     x_train, x_valid = x[train_idx, :], x[valid_idx, :]
-    train(exp_name, gen, dis, gan, x_train, x_valid, vocab_sizes, epochs=50)
+    train(exp_name, gen, dis, gan, x_train, x_valid, vocab_sizes, epochs=epochs)
     return gen, dis, gan
 
 
 if __name__ == "__main__":
-    pass
-    #    run()
+    run()
