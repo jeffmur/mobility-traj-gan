@@ -16,7 +16,7 @@ from tensorflow.keras.preprocessing.sequence import pad_sequences
 SEED = 11
 
 # Masked Loss from LSTM-TrajGAN
-def traj_loss(real_traj, gen_traj, mask, vocab_sizes, latlon_weight=10):
+def traj_loss(real_traj, gen_traj, mask, vocab_sizes, latlon_weight=10.0):
     """Novel trajectory loss from LSTM-TrajGAN paper"""
     traj_length = K.sum(mask, axis=1)
     masked_latlon_full = K.sum(
@@ -34,7 +34,7 @@ def traj_loss(real_traj, gen_traj, mask, vocab_sizes, latlon_weight=10):
     cat_losses = []
     for idx in range(1, len(vocab_sizes) + 1):
         ce_loss = tf.compat.v1.nn.softmax_cross_entropy_with_logits_v2(
-            gen_traj[idx], real_traj[idx]
+            real_traj[idx], gen_traj[idx]
         )
         ce_loss_masked = tf.multiply(ce_loss, K.sum(mask, axis=2))
         ce_mean = K.sum(tf.math.divide(ce_loss_masked, traj_length))
@@ -375,7 +375,7 @@ def run():
     # x = x[0 : (len(vocab_sizes) + 1)]
     # Padding zero to reach the maxlength
     x = np.concatenate(
-        [pad_sequences(f, timesteps, padding="pre", dtype="float64") for f in x], axis=2
+        [pad_sequences(f, timesteps, padding="pre", dtype="float32") for f in x], axis=2
     )
 
     n = x.shape[0]
@@ -386,3 +386,7 @@ def run():
     x_train, x_valid = x[train_idx, :], x[valid_idx, :]
     train(exp_name, gen, dis, gan, x_train, x_valid, vocab_sizes, epochs=50)
     return gen, dis, gan
+
+
+if __name__ == "__main__":
+    run()
