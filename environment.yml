@@ -15,3 +15,4 @@ dependencies:
   - black
   - numpy=1.19.5
   - python-dotenv
+  - geohash2
