@@ -3,15 +3,11 @@
 TensorFlow 2 reimplementation of the Multi-Aspect Trajectory Classifier model
 from: https://github.com/bigdata-ufsc/petry-2020-marc
 """
-
-import sys
-
 import geohash2 as gh
 import numpy as np
 import pandas as pd
 from sklearn.preprocessing import LabelEncoder, OneHotEncoder
-from tensorflow.keras import (Model, initializers, layers, optimizers,
-                              regularizers)
+from tensorflow.keras import Model, initializers, layers, optimizers, regularizers
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 
 base32 = [
@@ -109,32 +105,28 @@ def get_trajectories(df, tid_col="tid", label_col="label", geo_precision=8):
     x = [np.asarray(f) for f in x]
     y = one_hot_y.transform(pd.DataFrame(y)).toarray()
 
-    return (keys, vocab_size, num_classes, max_length, x, y)
+    return (vocab_size, num_classes, max_length, x, y)
 
 
-cls_x_train = [pad_sequences(f, max_length, padding="pre") for f in x_train]
-cls_x_test = [pad_sequences(f, max_length, padding="pre") for f in x_test]
-cls_y_train = y_train
-cls_y_test = y_test
-
-
-def build_classifier(vocab_size, num_classes, embedder_size=100, hidden_units=100, dropout=0.5):
+def build_classifier(
+    vocab_size, timesteps, num_classes, embedder_size=100, hidden_units=100, dropout=0.5
+):
     """Build the classifier Keras model."""
     inputs = []
     embeddings = []
 
-    for key in keys:
+    for key, val in vocab_size.items():
         if key == "lat_lon":
-            i = layers.Input(shape=(max_length, vocab_size[key]), name="input_" + key)
+            i = layers.Input(shape=(timesteps, val), name="input_" + key)
             e = layers.Dense(
                 units=embedder_size,
                 kernel_initializer=initializers.he_uniform(),
                 name="emb_" + key,
             )(i)
         else:
-            i = layers.Input(shape=(max_length,), name="input_" + key)
+            i = layers.Input(shape=(timesteps,), name="input_" + key)
             e = layers.Embedding(
-                vocab_size[key], embedder_size, input_length=max_length, name="emb_" + key
+                vocab_size[key], embedder_size, input_length=timesteps, name="emb_" + key
             )(i)
         inputs.append(i)
         embeddings.append(e)
@@ -161,15 +153,21 @@ def build_classifier(vocab_size, num_classes, embedder_size=100, hidden_units=10
         loss="categorical_crossentropy",
         metrics=["acc", "top_k_categorical_accuracy"],
     )
+    return classifier
 
 
-classifier.fit(
-    x=cls_x_train,
-    y=cls_y_train,
-    validation_data=(cls_x_test, cls_y_test),
-    batch_size=64,
-    shuffle=True,
-    epochs=1000,
-    verbose=0,
-    callbacks=[],
-)
+def train(train_df, test_df, epochs):
+    """Train the MARC trajectory classifier model."""
+    vocab_size, num_classes, timesteps, x_train, y_train = get_trajectories(train_df)
+    _, _, _, x_test, y_test = get_trajectories(test_df)
+    model = build_classifier(vocab_size, timesteps, num_classes)
+    model.fit(
+        x=x_train,
+        y=y_train,
+        validation_data=(x_test, y_test),
+        batch_size=64,
+        shuffle=True,
+        epochs=epochs,
+        verbose=0,
+        callbacks=[],  # TODO: Early Stopping callback
+    )
