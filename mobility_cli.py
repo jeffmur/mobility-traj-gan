@@ -1,4 +1,8 @@
 import click
+import pandas as pd
+import sys
+
+print(sys.path)
 from src.models import marc
 
 
@@ -6,10 +10,13 @@ from src.models import marc
 @click.argument("train_file", type=click.Path(exists=True))
 @click.argument("test_file", type=click.Path(exists=True))
 @click.argument("result_file", type=click.Path())
-@click.argument("dataset_name", type=click.STRING)
-def train_marc():
+@click.argument("epochs", type=click.INT)
+def train_marc(train_file, test_file, result_file, epochs):
     """Train the MARC trajectory-user linking classifier."""
-    marc.train()
+
+    train_df = pd.read_csv(train_file)
+    test_df = pd.read_csv(test_file)
+    marc.train(train_df, test_df, epochs)
 
 
 @click.group()
@@ -18,7 +25,7 @@ def cli():
 
 
 def main():
-    cli.add_command()
+    cli.add_command(train_marc)
     cli()
 
 

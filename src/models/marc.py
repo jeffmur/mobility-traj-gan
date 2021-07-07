@@ -44,38 +44,40 @@ def bin_geohash(lat, lon, precision=15):
     return np.concatenate([base32toBin[x] for x in hashed])
 
 
-def get_trajectories(df, tid_col="tid", label_col="label", geo_precision=8):
-    keys = list(df.keys())
+def get_trajectories(df_train, df_test, tid_col="tid", label_col="label", geo_precision=8):
+    df = df_train.copy().append(df_test)
+    tids_train = df_train[tid_col].unique()
+    keys = list(df_train.keys())
     vocab_size = {}
     keys.remove(tid_col)
-    num_classes = len(set(df[label_col]))
-    count_attr = 0
+    num_classes = df[label_col].nunique()
     lat_lon = False
 
     if "lat" in keys and "lon" in keys:
         keys.remove("lat")
         keys.remove("lon")
         lat_lon = True
-        count_attr += geo_precision * 5
 
     for attr in keys:
-        df[attr] = LabelEncoder().fit_transform(df[attr])
-        vocab_size[attr] = max(df[attr]) + 1
+        # This is a bad practice because encoder is being fitted on the test set
+        lab_enc = LabelEncoder()
+        df[attr] = lab_enc.fit_transform(df[attr])
 
         if attr != label_col:
-            values = len(set(df[attr]))
-            count_attr += values
+            vocab_size[attr] = max(df[attr]) + 1
 
     keys.remove(label_col)
 
     x = [[] for key in keys]
     y = []
+    idx_train = []
+    idx_test = []
     max_length = 0
 
     if lat_lon:
         x.append([])
 
-    for tid in set(df[tid_col]):
+    for idx, tid in enumerate(df[tid_col].unique()):
         traj = df.loc[df[tid_col].isin([tid])]
         features = np.transpose(traj.loc[:, keys].values)
 
@@ -93,6 +95,11 @@ def get_trajectories(df, tid_col="tid", label_col="label", geo_precision=8):
         label = traj[label_col].iloc[0]
         y.append(label)
 
+        if tid in tids_train:
+            idx_train.append(idx)
+        else:
+            idx_test.append(idx)
+
         if traj.shape[0] > max_length:
             max_length = traj.shape[0]
 
@@ -105,7 +112,15 @@ def get_trajectories(df, tid_col="tid", label_col="label", geo_precision=8):
     x = [np.asarray(f) for f in x]
     y = one_hot_y.transform(pd.DataFrame(y)).toarray()
 
-    return (vocab_size, num_classes, max_length, x, y)
+    x_train = np.asarray([f[idx_train] for f in x])
+    y_train = y[idx_train]
+    x_test = np.asarray([f[idx_test] for f in x])
+    y_test = y[idx_test]
+
+    x_train_pad = [pad_sequences(f, max_length, padding="pre") for f in x_train]
+    x_test_pad = [pad_sequences(f, max_length, padding="pre") for f in x_test]
+
+    return (vocab_size, num_classes, max_length, x_train_pad, y_train, x_test_pad, y_test)
 
 
 def build_classifier(
@@ -158,8 +173,9 @@ def build_classifier(
 
 def train(train_df, test_df, epochs):
     """Train the MARC trajectory classifier model."""
-    vocab_size, num_classes, timesteps, x_train, y_train = get_trajectories(train_df)
-    _, _, _, x_test, y_test = get_trajectories(test_df)
+    vocab_size, num_classes, timesteps, x_train, y_train, x_test, y_test = get_trajectories(
+        train_df, test_df
+    )
     model = build_classifier(vocab_size, timesteps, num_classes)
     model.fit(
         x=x_train,
@@ -168,6 +184,5 @@ def train(train_df, test_df, epochs):
         batch_size=64,
         shuffle=True,
         epochs=epochs,
-        verbose=0,
         callbacks=[],  # TODO: Early Stopping callback
     )
