@@ -20,7 +20,9 @@ def _get_grid(cell_size: float) -> pd.DataFrame:
     pandas.DataFrame
         A DataFrame containing the timestamped grid row and column positions of each user.
     """
-    bounding_box = preprocess.fetchGeoLocation("Lausanne, District de Lausanne, Vaud, Switzerland")
+    bounding_box = preprocess.fetch_geo_location(
+        "Lausanne, District de Lausanne, Vaud, Switzerland"
+    )
     # ['46.5043006', '46.6025773', '6.5838681', '6.7208137']
 
     bounds, step, pix = freq_matrix.set_map(bounding_box, cell_size)

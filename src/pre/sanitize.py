@@ -42,14 +42,13 @@ headers = [
     "Speed Accuracy",
     "Time_Since_Boot",
 ]
-gpsLong = pre.toPandas(cleanGPS, headers, " ")
+gpsLong = pre.to_pandas(cleanGPS, headers, " ")
 
 # Drop extra headers
 newGPS = gpsLong[["UID", "Unix", "Latitude", "Longitude"]]
 
 # Convert Unix to Date, Time respectively
-# TODO: This function doesn't exist in the codebase
-gps = pre.unixToTimeStamp(newGPS)
+gps = pre.unix_to_timestamp(newGPS)
 
 # # Then save
 gps.to_csv("cleanGPS.csv")
