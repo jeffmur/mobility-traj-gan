@@ -25,16 +25,16 @@ if __name__ == "__main__":
     # Data setup, modular cell_size for spatial resolution
     cell_size = config.CELL_SIZE_METERS * config.MILES_PER_METER  # meters * conversion to miles
     bounds, step, pix = freq_matrix.set_map(bounding_box, cell_size)
-    df = pd.read_csv(Path(config.DATA_INPUT_DIR) / config.DATA_INPUT_FILE, index_col=0)
+    df = pd.read_csv(Path(config.DATA_OUTPUT_DIR) / config.DATA_INPUT_FILE)
 
     # output file with raw GPS coordinates
-    df_bb = freq_matrix.filter_bounds(df, bounds)
+    df_bb = freq_matrix.filter_bounds(df, bounds, "Latitude", "Longitude")
     df_bb[["UID", "Date", "Time", "Latitude", "Longitude"]].to_csv(
-        Path(config.DATA_OUTPUT_DIR) / f"gps_bb_all_users.csv", index=False
+        Path(config.DATA_OUTPUT_DIR) / "gps_bb_all_users.csv", index=False
     )
 
     # Useful analytics + exportList
-    maxVal, freq_heatmap, exportList = freq_matrix.create_2d_freq(df, bounds, step, pix)
+    _, _, exportList = freq_matrix.create_2d_freq(df, bounds, step, pix)
 
     # Export List to CSV in OUTPUT DIR
     exportList[["UID", "Date", "Time", "Column", "Row"]].to_csv(
