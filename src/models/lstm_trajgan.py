@@ -1,4 +1,4 @@
-"""models/gan.py
+"""models/lstm_trajgan.py
 GAN model
 Rewrite of LSTM-TrajGAN for TF2
 """

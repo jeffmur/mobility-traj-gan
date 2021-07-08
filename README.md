@@ -19,21 +19,20 @@ environment with privacy preservation.
 
 ## TODOs
 
-
 - [x] Port LSTM-TrajGAN to TensorFlow 2 so it can be run in the same environment
 - [x] Train LSTM-TrajGAN on Foursquare NYC dataset
 - [x] Preprocessing code for MDC data so it can be fed into LSTM-TrajGAN
 - [ ] Train LSTM-TrajGAN on MDC dataset
+- [x] Port MARC reidentifier model to TF2
+- [ ] Train MARC on MDC dataset
+- [ ] Compare MARC performance on real vs. generated MDC trajectories for LSTM-TrajGAN
 - [ ] Preprocessing code for GeoLife data so it can be fed into LSTM-TrajGAN
 - [ ] LSTM-TrajGAN training on GeoLife dataset
 - [ ] Preprocessing code for Privamov data so it can be fed into LSTM-TrajGAN
 - [ ] LSTM-TrajGAN training on Privamov dataset
 - [ ] Post-processing code to output LSTM-TrajGAN generated trajectories to CSV
 - [ ] Get outputs from Yuting's LSTM-AE model on MDC, FourSquare, Privamov and GeoLife datasets
-- [x] Implement MARC reidentifier model (in TF2)
-- [ ] Train MARC on MDC dataset
-- [ ] Train MARC on FourSquare NYC dataset
+- [x] Train MARC on FourSquare NYC dataset
 - [ ] Train MARC on GeoLife dataset
 - [ ] Train MARC on Privamov dataset
-- [ ] Compare MARC performance on real vs. generated trajectories for LSTM-TrajGAN
 - [ ] Compare MARC performance on real vs. generated trajectories for LSTM-AE

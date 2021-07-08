@@ -3,7 +3,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from sklearn.cluster import KMeans
-from sklearn.preprocessing import MinMaxScaler, OrdinalEncoder
+from sklearn.preprocessing import MinMaxScaler, OrdinalEncoder, OneHotEncoder
 from src.lib import config, freq_matrix, preprocess
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.utils import to_categorical
@@ -192,12 +192,18 @@ def prep_data_sessions(maxlen_ntile=0.5):
 # Preprocessing code for comparison with TrajGAN approach
 
 
-def get_gps_traj(min_points=2):
+def get_vocab_sizes(df):
+    """Count the number of levels of each categorical variable in the dataset."""
+    return df.drop(["lat", "lon"], axis=1, errors="ignore").nunique().to_dict()
+
+
+def get_mdc_gps_traj(min_points=2):
     """Split the GPS data into user-week trajectories at 10 minute resolution."""
     df = pd.read_csv(config.GPS_BB)
-    df.columns = ["uid", "date", "time", "lat", "lon"]
+    # label = user ID
+    df.columns = ["label", "date", "time", "lat", "lon"]
     df["datetime"] = pd.to_datetime(df["date"] + " " + df["time"])
-    df = df.sort_values(["uid", "datetime"])
+    df = df.sort_values(["label", "datetime"])
     df["year"] = df["datetime"].dt.year
     df["month"] = df["datetime"].dt.month
     df["day"] = df["datetime"].dt.day
@@ -207,30 +213,46 @@ def get_gps_traj(min_points=2):
     df["week"] = df["datetime"].dt.isocalendar().week
     df["tenminute"] = (df["datetime"].dt.minute // 10 * 10).astype(int)
     df = (
-        df.groupby(["uid", "year", "month", "week", "day", "weekday", "hour", "tenminute"])
+        df.groupby(["label", "year", "month", "week", "day", "weekday", "hour", "tenminute"])
         .agg({"lat": "mean", "lon": "mean"})
         .reset_index()
     )
     # filter out trajectories with fewer than min points
-    df = df.groupby(["uid", "year", "week"]).filter(lambda x: len(x) >= min_points).reset_index()
-    df["tid"] = df.groupby(["uid", "year", "week"]).ngroup()
-    return df[["uid", "tid", "lat", "lon", "weekday", "hour"]]
+    df = df.groupby(["label", "year", "week"]).filter(lambda x: len(x) >= min_points).reset_index()
+    df["tid"] = df.groupby(["label", "year", "week"]).ngroup()
+    return df[["label", "tid", "lat", "lon", "weekday", "hour"]]
 
 
-def scale_gps(df):
-    """Prepare GPS data with standardized distance from a centroid."""
+def scale_gps(df: pd.DataFrame, kmeans: KMeans = None, scaler: MinMaxScaler = None):
+    """
+    Prepare GPS data with standardized distance from a centroid.
+    To transform test data without fitting, pass KMeans and MinMaxScaler instances that are
+    pre-fitted on the training data.
+    """
     df1 = df.copy()
-    kmeans = KMeans(n_clusters=1).fit(df1[["lat", "lon"]])
+    if kmeans is None:
+        kmeans = KMeans(n_clusters=1).fit(df1[["lat", "lon"]])
     centr_lat, centr_lon = kmeans.cluster_centers_[0]
     df1.loc[:, "lat"] = df1["lat"] - centr_lat
     df1.loc[:, "lon"] = df1["lon"] - centr_lon
-    scaler = MinMaxScaler().fit(df1[["lat", "lon"]])
+    if scaler is None:
+        scaler = MinMaxScaler().fit(df1[["lat", "lon"]])
     df1.loc[:, ["lat", "lon"]] = scaler.transform(df1[["lat", "lon"]])
+    # return the scalers so we can transform test data and reverse transform generated data.
     return df1, kmeans, scaler
 
 
-def gps_to_tensor(df, max_len_qtile=0.95, padding="post"):
-    """transform trajectories DataFrame to a NumPy tensor"""
+def gps_to_tensor(
+    df: pd.DataFrame, max_len_qtile: float = 0.95, padding: str = "pre", encoding: str = "onehot"
+):
+    """
+    Transform trajectories DataFrame to a NumPy tensor.
+    padding = "pre" or "post"
+    encoding: "onehot" or "ordinal"
+    """
+    vocab_sizes = get_vocab_sizes(df)
+    encoder = OneHotEncoder if encoding == "onehot" else OrdinalEncoder
+
     weekday_cat = pd.DataFrame(
         to_categorical(df["weekday"], num_classes=7), columns=[f"weekday_{i}" for i in range(0, 7)]
     )
@@ -240,8 +262,8 @@ def gps_to_tensor(df, max_len_qtile=0.95, padding="post"):
     df = pd.concat([df.drop(["weekday", "hour"], axis=1), weekday_cat, hour_cat], axis=1)
     tid_groups = df.groupby("tid").groups
     tid_dfs = [df.iloc[g] for g in tid_groups.values()]
-    # UID is a label, split it into a separate vector
-    uids = np.array([tdf.uid.values[0] for tdf in tid_dfs])
+    # label is the y variable, split it into a separate vector
+    labels = np.array([tdf.label.values[0] for tdf in tid_dfs])
     # get percentile of sequence length
     x_lengths = sorted([len(l) for l in tid_dfs])
     pct_idx = round(len(x_lengths) * max_len_qtile)
@@ -250,10 +272,10 @@ def gps_to_tensor(df, max_len_qtile=0.95, padding="post"):
     x_pad = pad_sequences(
         x_nested, maxlen=maxlen, padding=padding, truncating=padding, value=0.0, dtype=float
     )
-    return x_pad, uids
+    return x_pad, labels
 
 
-def tensor_to_gps(x, uids, kmeans, scaler):
+def tensor_to_gps(x, labels, kmeans, scaler):
     """Convert the tensor representation back to a data frame of GPS records."""
     tids = np.repeat(np.expand_dims(np.arange(0, x.shape[0]), axis=1), x.shape[1], axis=1).reshape(
         x.shape[0] * x.shape[1]
@@ -261,17 +283,17 @@ def tensor_to_gps(x, uids, kmeans, scaler):
     # tids = np.repeat(np.expand_dims(tids, axis=1), x.shape[1], axis=1).reshape(
     #     x.shape[0] * x.shape[1]
     # )
-    uids = np.repeat(np.expand_dims(uids, axis=1), x.shape[1], axis=1).reshape(
+    labels = np.repeat(np.expand_dims(labels, axis=1), x.shape[1], axis=1).reshape(
         x.shape[0] * x.shape[1]
     )
     x_res = np.reshape(x, (x.shape[0] * x.shape[1], x.shape[2]))
     df = pd.DataFrame(x_res)
     df["tid"] = tids
-    df["uid"] = uids
+    df["label"] = labels
     df = df[df[0] + df[1] != 0.0].reset_index()
     df.loc[:, ["lat", "lon"]] = scaler.inverse_transform(df[[0, 1]])
     df["lat"] = df["lat"] + kmeans.cluster_centers_[0][0]
     df["lon"] = df["lon"] + kmeans.cluster_centers_[0][1]
     df["weekday"] = df[list(range(2, 9))].idxmax(axis=1) - 2
     df["hour"] = df[list(range(9, 33))].idxmax(axis=1) - 9
-    return df[["uid", "tid", "lat", "lon", "weekday", "hour"]]
+    return df[["label", "tid", "lat", "lon", "weekday", "hour"]]
