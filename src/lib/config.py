@@ -55,3 +55,8 @@ GPS_BB = os.getenv("GPS_BB")
 """
 Path to the file with raw GPS coordinates but filtered to bounding box region
 """
+
+CITY = os.getenv("CITY")
+"""
+Name of the city to retrieve the bounding box for.
+"""

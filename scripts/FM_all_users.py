@@ -17,9 +17,8 @@ Output: cell_size (meters or miles)_all_users.csv
 """
 if __name__ == "__main__":
     # HTTP request or set to static bounds
-    bounding_box = preprocess.fetch_geo_location(
-        "Lausanne, District de Lausanne, Vaud, Switzerland"
-    )
+    bounding_box = preprocess.fetch_geo_location(config.CITY)
+    # "Lausanne, District de Lausanne, Vaud, Switzerland" =
     # ['46.5043006', '46.6025773', '6.5838681', '6.7208137']
 
     # Data setup, modular cell_size for spatial resolution
