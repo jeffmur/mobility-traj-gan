@@ -1,35 +1,33 @@
-# Sanitizing the MDC dataset
-# Please read through before executing
-# Jeffrey Murray Jr
 """
+Sanitizing the MDC dataset
+Jeffrey Murray Jr
+Updated by Alex Kyllo 2021-07-08
+
 * Input of Raw Set
 * Removes extra spaces and Nulls
-* Converts Unix to Date, Time respectively
+* Converts Unix to DateTime respectively
 * Saves to csv
 """
+import sys
+from pathlib import Path
 
-import src.lib.preprocess as pre
+sys.path.append(".")
+import pandas as pd
+from src.lib import config
 
 ## Paths : TO CHANGE FOR LOCAL SETUP ## TODO
 # raw gps.csv file in mdc
-rawGPS = "PATH/FROM/gps-raw.csv"
-cleanGPS = "PATH/TO/cleanGPS.csv"
-
+input_path = Path(config.DATA_INPUT_DIR)
+print(f"Reading MDC data from {input_path}")
+output_path = Path(config.DATA_OUTPUT_DIR)
+raw_gps = input_path / "gps.csv"
 # raw records.csv file in mdc
-rawRecords = "PATH/FROM/records-raw.csv"
-cleanRecords = "PATH/TO/cleanRecords.csv"
+raw_records = input_path / "records.csv"
+output_file = output_path / config.DATA_INPUT_FILE
 
-# records that only contain gps label (use grep) -- important
-gpsRecords = "PATH/FROM/CLEANED/gps-ONLY-records.csv"
-
-## ------------------------------
-
-# Drop spaces and save as cleanGPS.csv
-pre.removeSpaces(rawGPS, cleanGPS)
-
-# Create Pandas Dataset
+# column names
 headers = [
-    "UID",
+    "RID",
     "Unix",
     "Longitude",
     "Latitude",
@@ -42,48 +40,27 @@ headers = [
     "Speed Accuracy",
     "Time_Since_Boot",
 ]
-gpsLong = pre.to_pandas(cleanGPS, headers, " ")
+
+# Read in raw gps
+df = pd.read_table(raw_gps, names=headers)
 
 # Drop extra headers
-newGPS = gpsLong[["UID", "Unix", "Latitude", "Longitude"]]
+df = df[["RID", "Unix", "Latitude", "Longitude"]]
 
-# Convert Unix to Date, Time respectively
-gps = pre.unix_to_timestamp(newGPS)
+# Convert Unix to datetime
+df.loc[:, "DateTime"] = pd.to_datetime(df.Unix, unit="s")
+df = df.drop(["Unix"], axis=1)
 
-# # Then save
-gps.to_csv("cleanGPS.csv")
+rec_headers = ["RID", "UID", "tz", "time", "type"]
+iter_rec = pd.read_table(raw_records, names=rec_headers, iterator=True, chunksize=10000)
+df_rec = pd.concat([chunk[chunk["type"] == "gps"] for chunk in iter_rec])
 
-"""
-With the data cleaned, we can now decode Database keys for User IDs
-To do this, we must use records.csv (which also must be cleaned)
-"""
-pre.removeSpaces(rawRecords, cleanRecords)
+# Join gps to records on RID
+df = df.set_index("RID")
+df_rec = df_rec.set_index("RID")
 
-# --- IMPORTANT ---
-# --- $ cat records.csv | grep -w 'gps' > gpsrecords.csv
-# --- Execute Before Continuing ---
+df = df.join(df_rec, how="inner")
+df = df[["UID", "DateTime", "Latitude", "Longitude"]]
 
-
-# headers = ['DB', 'UID', 'tz', 'time', 'type']
-# records = pre.toPandas(gpsRecords, headers, ' ')
-
-# print(f" There are {records['UID'].nunique()} unique users")
-
-# ## Create a dictionary for O(1) reading, O(N) for intialization
-# dictOfRecords = {}
-# for row in records.itertuples():
-#     KEY = row.DB
-#     VAL = row.UID
-
-#     dictOfRecords[KEY] = VAL
-
-# replaceUID = gps['UID'].to_numpy()
-
-# # O(N) to replace each key (Database) w/ value (UID)
-# for i in range(0, len(replaceUID)):
-#     replaceUID[i] = dictOfRecords[replaceUID[i]]
-
-# final_gps = gps[['UID', 'Date', 'Time' ,'Latitude', 'Longitude']]
-# final_gps['UID'] = replaceUID
-
-# final_gps.to_csv('gps-sanitized.csv')
+df.to_csv(output_file, index=False)
+print(f"Cleaned MDC data written to {output_file}")

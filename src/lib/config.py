@@ -30,9 +30,7 @@ DATASET = str(os.getenv("DATASET"))
 Name of the dataset we are processing. Could be "GeoLife", "MDC", etc.
 """
 
-DATA_HEADERS = {"MDC": ["Index", "UID", "Date", "Time", "Latitude", "Longitude"]}.get(
-    DATASET
-)
+DATA_HEADERS = {"MDC": ["Index", "UID", "Date", "Time", "Latitude", "Longitude"]}.get(DATASET)
 """
 Path to parsed dataset / (mdc || geoLife || privamov || etc.) /user_by_month/ included
 """

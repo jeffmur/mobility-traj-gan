@@ -2,7 +2,7 @@ import click
 import pandas as pd
 import sys
 
-print(sys.path)
+sys.path.append(".")
 from src.models import marc
 
 
