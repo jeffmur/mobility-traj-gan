@@ -12,10 +12,13 @@ from sklearn.utils.validation import check_is_fitted
 class GPSGridTransformer(TransformerMixin, BaseEstimator):
     """A processor that transforms GPS locations into grid positions in a rectangular grid."""
 
+    # TODO
+
 
 class GPSGeoHasher(TransformerMixin, BaseEstimator):
     """A processor that uses the GeoHash algorithm to discretize the GPS locations."""
-    def __init__(self, precision)
+
+    # TODO
 
 
 class GPSNormalizer(TransformerMixin, BaseEstimator):
