@@ -5,6 +5,38 @@ import sys
 sys.path.append(".")
 from src.models import marc
 
+MODELS = ["trajgan", "marc"]
+DATASETS = ["mdc_lausanne", "foursquare_nyc", "geolife_beijing"]
+
+
+@click.command()
+@click.argument("model", type=click.Choice(MODELS))
+@click.argument("dataset", type=click.Choice(DATASETS))
+@click.argument("epochs", type=click.INT)
+def train(model):
+    """Train MODEL on DATASET for EPOCHS"""
+
+
+@click.command()
+@click.argument("saved_model", type=click.Path(exists=True, file_okay=False))
+@click.argument("dataset", type=click.Choice(DATASETS))
+@click.argument("output_path", type=click.Path(dir_okay=False))
+@click.option(
+    "--n",
+    type=click.INT,
+    default=-1,
+    help="The number of synthetic examples to generate. Default is the size of original dataset.",
+)
+def generate(saved_model, dataset, output_path, n):
+    """Use SAVED_MODEL to generate NUM trajectories based on DATASET and write to OUTPUT_PATH as CSV."""
+
+
+@click.command()
+@click.argument("saved_model", type=click.Path(exists=True, file_okay=False))
+@click.argument("dataset", type=click.Choice(DATASETS))
+def predict():
+    """Use SAVED_MODEL to predict the labels of DATASET."""
+
 
 @click.command()
 @click.argument("train_file", type=click.Path(exists=True))
@@ -25,7 +57,9 @@ def cli():
 
 
 def main():
-    cli.add_command(train_marc)
+    cli.add_command(train)
+    cli.add_command(generate)
+    cli.add_command(predict)
     cli()
 
 
