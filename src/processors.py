@@ -65,6 +65,7 @@ class GPSNormalizer(TransformerMixin, BaseEstimator):
     def __init__(self, feature_range=(0, 1)):
         self.scaler = MinMaxScaler(feature_range)
         self.kmeans = KMeans(n_clusters=1)
+        self.feature_range = feature_range
         super().__init__()
 
     def fit(self, X):

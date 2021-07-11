@@ -186,3 +186,13 @@ def train(train_df, test_df, epochs):
         epochs=epochs,
         callbacks=[],  # TODO: Early Stopping callback
     )
+
+
+class MARC:
+    """An LSTM-based trajectory classifier network.
+
+    Based on: May Petry, L., Leite Da Silva, C., Esuli, A., Renso, C., and Bogorny, V. (2020).
+    MARC: a robust method for multiple-aspect trajectory classification via space, time,
+    and semantic embeddings.
+    International Journal of Geographical Information Science, 34(7), 1428-1450.
+    """

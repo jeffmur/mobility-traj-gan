@@ -36,9 +36,23 @@ class MDCLausanne(Dataset):
             "speed_accuracy",
             "time_since_boot",
         ]
-        self.columns = ["label", "datetime", "lat", "lon"]
+        self.label_column = "label"
+        self.trajectory_column = "tid"
+        self.lat_column = "lat"
+        self.lon_column = "lon"
+        self.columns = [self.label_column, self.trajectory_column, self.lat_column, self.lon_column]
 
-    def preprocess(self, output_file="data/mdc_lausanne.csv"):
+    def preprocess(self, output_file: os.PathLike = "data/mdc_lausanne.csv"):
+        """Preprocess the raw data into a single CSV file of trajectory data.
+
+        Long-running (takes a few minutes).
+
+        Parameters
+        ----------
+        output_file : os.PathLike
+            The file path to save the processed CSV data.
+        """
+
         if os.path.exists(output_file):
             df = pd.read_csv(output_file)
             df.datetime = pd.to_datetime(df.datetime)
@@ -73,7 +87,18 @@ class MDCLausanne(Dataset):
         LOG.info("Preprocessed data written to: %s", output_file)
         return df
 
-    def to_trajectories(self, min_points=2):
+    def to_trajectories(self, min_points: int = 2):
+        """Return the dataset as a Pandas DataFrame split into user-week trajectories.
+
+        Multiple points within a ten minute interval will be removed.
+
+        Parameters
+        ----------
+        min_points : int
+            The minimum number of location points (rows) in a
+            trajectory to include it in the dataset.
+        """
+
         df = self.preprocess()
         df = df.sort_values(["label", "datetime"])
         df["year"] = df["datetime"].dt.year
@@ -85,7 +110,9 @@ class MDCLausanne(Dataset):
         df["week"] = df["datetime"].dt.isocalendar().week
         df["tenminute"] = (df["datetime"].dt.minute // 10 * 10).astype(int)
         df = (
-            df.groupby(["label", "year", "month", "week", "day", "weekday", "hour", "tenminute"])
+            df.groupby(
+                [self.label_column, "year", "month", "week", "day", "weekday", "hour", "tenminute"]
+            )
             .agg({"lat": "mean", "lon": "mean"})
             .reset_index()
         )
@@ -95,6 +122,17 @@ class MDCLausanne(Dataset):
             .filter(lambda x: len(x) >= min_points)
             .reset_index()
         )
-        df["tid"] = df.groupby(["label", "year", "week"]).ngroup()
-        df = df[["label", "tid", "lat", "lon", "weekday", "hour"]]
+        df[self.trajectory_column] = df.groupby([self.label_column, "year", "week"]).ngroup()
+        df = df[[self.label_column, self.trajectory_column, "lat", "lon", "weekday", "hour"]]
+
         return df
+
+    def get_vocab_sizes(self):
+        """Get a dictionary of categorical features and their cardinalities."""
+        df = self.to_trajectories()
+        return (
+            df.drop([self.label_column, self.trajectory_column], axis=1, errors="ignore")
+            .select_dtypes("int")
+            .nunique()
+            .to_dict()
+        )

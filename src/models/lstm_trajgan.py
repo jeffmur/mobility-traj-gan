@@ -5,13 +5,20 @@ Rewrite of LSTM-TrajGAN for TF2
 import csv
 import os
 from datetime import datetime
+from typing import Any, Dict
 
 import numpy as np
+import pandas as pd
 import tensorflow as tf
+from sklearn.model_selection import GroupShuffleSplit
+from sklearn.preprocessing import OneHotEncoder
 from tensorflow.keras import Model
 from tensorflow.keras import backend as K
 from tensorflow.keras import initializers, layers, losses, optimizers, regularizers
 from tensorflow.keras.preprocessing.sequence import pad_sequences
+
+from src.datasets import Dataset
+from src.processors import GPSNormalizer
 
 SEED = 11
 
@@ -45,8 +52,17 @@ def traj_loss(real_traj, gen_traj, mask, latlon_weight=10.0):
     return total_loss
 
 
-def build_inputs_latlon(timesteps, dense_units):
-    """Build input layers for lat-lon features."""
+def build_inputs_latlon(timesteps: int, dense_units: int):
+    """Build input layer for the lat-lon features.
+
+    Parameters
+    ----------
+    timesteps : int
+        The number of time steps per trajectory.
+    dense_units : int
+        The number of dense units for lat-lon embedding.
+    """
+
     i = layers.Input(shape=(timesteps, 2), name="input_latlon")
     unstacked = layers.Lambda(lambda x: tf.unstack(x, axis=1))(i)
     d = layers.Dense(
@@ -115,15 +131,37 @@ def build_inputs(
 
 
 def build_generator(
-    timesteps,
-    latlon_dense_units,
-    concat_dense_units,
-    lstm_units,
-    latent_dim,
-    lstm_reg,
-    vocab_sizes,
+    timesteps: int,
+    latlon_dense_units: int,
+    concat_dense_units: int,
+    lstm_units: int,
+    latent_dim: int,
+    lstm_reg: float,
+    vocab_sizes: Dict[str, int],
 ):
-    """Build the generator network."""
+    """Build the generator network.
+
+    Parameters
+    ----------
+    timesteps : int
+        The number of time steps per trajectory.
+    latlon_dense_units : int
+        The number of dense units in the latitude/longitude embedding
+        layer.
+    concat_dense_units : int
+        The number of dense units in the concatenated feature fusion
+        layer.
+    lstm_units : int
+        The number of units in the LSTM layer.
+    latent_dim : int
+        The dimension of the latent vector space.
+    lstm_reg : float
+        The L1 regularization strength for the LSTM units.
+    vocab_sizes : dict
+        A dictionary of each categorical feature name and its number
+        of distinct values.
+    """
+
     # Add random noise input
     inputs, emb_traj = build_inputs(
         timesteps,
@@ -381,6 +419,121 @@ def run():
     x_train, x_valid = x[train_idx, :], x[valid_idx, :]
     train(exp_name, gen, dis, gan, x_train, x_valid, vocab_sizes, epochs=epochs)
     return gen, dis, gan
+
+
+# TODO: make this into a model class
+
+
+class LSTMTrajGAN:
+    """An LSTM-based Trajectory Generative Adversarial Network.
+
+    Based on: Rao, J., Gao, S.*, Kang, Y. and Huang, Q. (2020).
+    LSTM-TrajGAN: A Deep Learning Approach to Trajectory Privacy Protection.
+    In the Proceedings of the 11th International Conference on Geographic
+    Information Science (GIScience 2021), pp. 1-16.
+    """
+
+    def __init__(self, dataset: Dataset, optimizer: Any):
+        self.dataset = dataset
+        self.vocab_sizes = dataset.get_vocab_sizes()
+        self.gps_normalizer = GPSNormalizer()
+        self.encoders = []
+        self.timesteps = None
+        # self.gen, self.dis, self.gan = build_gan(optimizer, self.timesteps, self.vocab_sizes)
+
+    def train_test_split(self, test_size: float = 0.2):
+        """Split the dataset into train and test sets.
+
+        Use a group shuffle split to assign each trajectory to either
+        the train set or the test set.
+
+        Parameters
+        ----------
+        test_size : float
+            The ratio of the data that should be assigned to the test set.
+        """
+        df = self.dataset.to_trajectories()
+        train_inds, test_inds = next(
+            GroupShuffleSplit(test_size=test_size, n_splits=2, random_state=SEED).split(
+                df, groups=df[self.dataset.trajectory_column]
+            )
+        )
+
+        train_set = df.iloc[train_inds]
+        test_set = df.iloc[test_inds]
+        return train_set, test_set
+
+    def preprocess(
+        self,
+        data: pd.DataFrame,
+        train: bool = True,
+        max_len_qtile: float = 0.95,
+        padding: str = "pre",
+    ):
+        """Transform trajectories DataFrame to a NumPy tensor with zero padding."""
+        df = data.copy()
+        latlon_cols = [self.dataset.lat_column, self.dataset.lon_column]
+        if train:
+            self.gps_normalizer.fit(df.loc[:, latlon_cols])
+        df.loc[:, latlon_cols] = self.gps_normalizer.transform(df.loc[:, latlon_cols])
+
+        encoded_features = []
+        for feature in self.vocab_sizes:
+            encoder = OneHotEncoder(sparse=False)
+            if train:
+                encoder.fit(df[[feature]])
+            feat_enc = pd.DataFrame(
+                encoder.transform(df[[feature]]),
+                columns=[f"{feature}_{i}" for i in range(0, self.vocab_sizes[feature])],
+            )
+            self.encoders.append(encoder)
+            encoded_features.append(feat_enc)
+        df = df.reset_index().drop("index", errors="ignore", axis=1)
+        df = df.drop(self.vocab_sizes.keys(), axis=1)
+        df = pd.concat([df, *encoded_features], axis=1)
+        tids = df[self.dataset.trajectory_column].unique()
+        tid_groups = df.groupby(self.dataset.trajectory_column).groups
+        tid_dfs = [df.iloc[g] for g in tid_groups.values()]
+        # label is a y-variable, split it into a separate vector
+        labels = np.array([tdf[self.dataset.label_column].values[0] for tdf in tid_dfs])
+        # get percentile of sequence length
+        x_lengths = sorted([len(l) for l in tid_dfs])
+        pct_idx = round(len(x_lengths) * max_len_qtile)
+        maxlen = x_lengths[pct_idx]
+        x_nested = [tdf.iloc[:, 2:].to_numpy() for tdf in tid_dfs]
+        x_pad = pad_sequences(
+            x_nested, maxlen=maxlen, padding=padding, truncating=padding, value=0.0, dtype=float
+        )
+        self.timesteps = maxlen
+        return x_pad, labels, tids
+
+    def postprocess(self, x: np.array, y: np.array, tids: np.array):
+        """Convert the tensor representation back to a data frame of GPS records."""
+        # TODO: some of the trajectories are coming out with differences.
+        tids = np.repeat(np.expand_dims(tids, axis=1), x.shape[1], axis=1).reshape(
+            x.shape[0] * x.shape[1]
+        )
+        labels = np.repeat(np.expand_dims(y, axis=1), x.shape[1], axis=1).reshape(
+            x.shape[0] * x.shape[1]
+        )
+        x_res = np.reshape(x, (x.shape[0] * x.shape[1], x.shape[2]))
+        df = pd.DataFrame(x_res)
+        df[self.dataset.label_column] = labels
+        df[self.dataset.trajectory_column] = tids
+        df = df[df[0] + df[1] != 0.0].reset_index()
+        latlon_cols = [self.dataset.lat_column, self.dataset.lon_column]
+        df.loc[:, latlon_cols] = self.gps_normalizer.inverse_transform(df[[0, 1]])
+
+        # Reverse one-hot encoding on categorical features
+        col_pos = 2
+        for idx, feature in enumerate(self.vocab_sizes.keys()):
+            encoder = self.encoders[idx]
+            df[feature] = encoder.inverse_transform(
+                df[list(range(col_pos, col_pos + self.vocab_sizes[feature]))]
+            )
+            col_pos += self.vocab_sizes[feature]
+
+        return df.iloc[:, df.columns.get_loc(self.dataset.label_column) :]
 
 
 if __name__ == "__main__":
