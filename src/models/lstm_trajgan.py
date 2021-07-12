@@ -490,7 +490,7 @@ class LSTMTrajGAN:
         test_size : float
             The ratio of the data that should be assigned to the test set.
         """
-        df = self.dataset.to_trajectories()
+        df = self.dataset.to_trajectories(min_points=10)
         train_inds, test_inds = next(
             GroupShuffleSplit(test_size=test_size, n_splits=2).split(
                 df, groups=df[self.dataset.trajectory_column]
@@ -540,8 +540,11 @@ class LSTMTrajGAN:
         maxlen = x_lengths[pct_idx]
         x_nested = [tdf.iloc[:, 2:].to_numpy() for tdf in tid_dfs]
         x_pad = pad_sequences(
-            x_nested, maxlen=maxlen, padding=padding, truncating=padding, value=0.0, dtype=float
+            x_nested, maxlen=maxlen, padding=padding, truncating=padding, value=0.0, dtype="float32"
         )
+        # add mask vector
+        mask = np.expand_dims((x_pad[:, :, 0] != 0.0).astype("float32"), axis=2)
+        x_pad = np.concatenate([x_pad, mask], axis=2)
         self.timesteps = maxlen
         return x_pad, labels, tids
 
@@ -587,7 +590,7 @@ class LSTMTrajGAN:
             self.optimizer = optimizers.Adam(0.001, 0.5)
         else:
             self.optimizer = optimizer
-        df = self.dataset.to_trajectories()
+        df = self.dataset.to_trajectories(min_points=10)
         train_set, _ = train_test_split(
             df, trajectory_column=self.dataset.trajectory_column, test_size=0.2
         )
@@ -616,7 +619,7 @@ class LSTMTrajGAN:
     def log_end(self, exp_name):
         self.end_time = datetime.now()
         self.duration = self.end_time - self.start_time
-        LOG.info(f"Experiment {exp_name} for model {model_name} finished in {duration}")
+        LOG.info(f"Experiment {exp_name} finished in {self.duration}")
 
     def save(self, save_path: os.PathLike):
         """Serialize the model to a checkpoint on disk."""
@@ -631,5 +634,5 @@ class LSTMTrajGAN:
         # TODO
 
 
-if __name__ == "__main__":
-    run()
+# if __name__ == "__main__":
+#    run()

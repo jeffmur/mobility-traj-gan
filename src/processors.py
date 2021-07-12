@@ -62,7 +62,7 @@ class GPSGeoHasher(TransformerMixin, BaseEstimator):
 class GPSNormalizer(TransformerMixin, BaseEstimator):
     """A processor that normalizes GPS coordinates as min-max scaled distance from a centroid."""
 
-    def __init__(self, feature_range=(0, 1)):
+    def __init__(self, feature_range=(-1, 1)):
         self.scaler = MinMaxScaler(feature_range)
         self.kmeans = KMeans(n_clusters=1)
         self.feature_range = feature_range
