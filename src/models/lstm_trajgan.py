@@ -606,7 +606,7 @@ class LSTMTrajGAN:
         self.log_start(exp_name, **hparams)
         train(exp_name, self.gen, self.dis, self.gan, x_train, x_valid, self.vocab_sizes, **hparams)
         self.log_end(exp_name)
-        self.save()
+        self.save(f"experiments/{exp_name}")
 
     # TODO: abstract these methods into a base class.
     def log_start(self, exp_name, **hparams):
