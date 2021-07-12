@@ -3,8 +3,11 @@ GAN model
 Rewrite of LSTM-TrajGAN for TF2
 """
 import csv
+import datetime
+import logging
 import os
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Dict
 
 import numpy as np
@@ -21,6 +24,8 @@ from src.datasets import Dataset
 from src.processors import GPSNormalizer
 
 SEED = 11
+LOG = logging.Logger(__name__)
+LOG.setLevel(logging.DEBUG)
 
 # Masked Loss from LSTM-TrajGAN
 def traj_loss(real_traj, gen_traj, mask, latlon_weight=10.0):
@@ -299,13 +304,15 @@ def train(
     epochs=200,
     batch_size=256,
     latent_dim=100,
-    save_interval=10,
+    patience=10,
 ):
     """Train the GAN."""
     start_time = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
     n_examples = x_train.shape[0]
     n_batches = np.ceil(n_examples / batch_size).astype(int)
     random_idx = np.random.permutation(x_train.shape[0])
+    best_loss = 10000
+    no_improvement = 0
     for i in range(1, epochs + 1):
         for j in range(1, n_batches + 1):
             idx = random_idx[batch_size * (j - 1) : batch_size * (j)]
@@ -363,10 +370,6 @@ def train(
                 D val accuracy real: {dis_val_r_acc:.2f}, fake: {dis_val_f_acc:.2f}""".splitlines()
             )
         )
-        # TODO: add logging
-        # TODO: add early stopping
-        if i % save_interval == 0:
-            gen.save(f"experiments/{exp_name}/{start_time}/{i:04d}")
         rounding = 3
         # log learning curves to a CSV file.
         write_csv(
@@ -379,6 +382,14 @@ def train(
             val_dis_acc_fake=round(dis_val_f_acc, rounding),
             val_dis_loss_fake=round(dis_val_f_loss, rounding),
         )
+        # early stopping and checkpointing
+        if gen_loss < best_loss:
+            best_loss = gen_loss
+            gen.save(f"experiments/{exp_name}/{start_time}/{i:04d}")
+        else:
+            no_improvement += 1
+            if no_improvement >= patience:
+                break
 
 
 def run():
@@ -421,6 +432,27 @@ def run():
     return gen, dis, gan
 
 
+def train_test_split(df: pd.DataFrame, trajectory_column: str = "tid", test_size: float = 0.2):
+    """Split the dataset into train and test sets.
+
+    Use a group shuffle split to assign each trajectory to either
+    the train set or the test set.
+
+    Parameters
+    ----------
+    trajectory_column : str
+        The column in the dataset that represents the trajectory ID, to randomize by.
+    test_size : float
+        The ratio of the data that should be assigned to the test set.
+    """
+    train_inds, test_inds = next(
+        GroupShuffleSplit(test_size=test_size, n_splits=2).split(df, groups=df[trajectory_column])
+    )
+    train_set = df.iloc[train_inds]
+    test_set = df.iloc[test_inds]
+    return train_set, test_set
+
+
 # TODO: make this into a model class
 
 
@@ -433,13 +465,19 @@ class LSTMTrajGAN:
     Information Science (GIScience 2021), pp. 1-16.
     """
 
-    def __init__(self, dataset: Dataset, optimizer: Any):
+    def __init__(self, dataset: Dataset):
         self.dataset = dataset
         self.vocab_sizes = dataset.get_vocab_sizes()
         self.gps_normalizer = GPSNormalizer()
         self.encoders = []
         self.timesteps = None
-        # self.gen, self.dis, self.gan = build_gan(optimizer, self.timesteps, self.vocab_sizes)
+        self.optimizer = None
+        self.gen = None
+        self.dis = None
+        self.gan = None
+        self.start_time = None
+        self.end_time = None
+        self.duration = None
 
     def train_test_split(self, test_size: float = 0.2):
         """Split the dataset into train and test sets.
@@ -454,7 +492,7 @@ class LSTMTrajGAN:
         """
         df = self.dataset.to_trajectories()
         train_inds, test_inds = next(
-            GroupShuffleSplit(test_size=test_size, n_splits=2, random_state=SEED).split(
+            GroupShuffleSplit(test_size=test_size, n_splits=2).split(
                 df, groups=df[self.dataset.trajectory_column]
             )
         )
@@ -534,6 +572,63 @@ class LSTMTrajGAN:
             col_pos += self.vocab_sizes[feature]
 
         return df.iloc[:, df.columns.get_loc(self.dataset.label_column) :]
+
+    def train(
+        self,
+        optimizer=None,
+        epochs: int = 200,
+        batch_size: int = 256,
+        latent_dim: int = 100,
+        test_size: float = 0.2,
+        patience: int = 10,
+    ):
+        """Train this model on a dataset."""
+        if optimizer is None:
+            self.optimizer = optimizers.Adam(0.001, 0.5)
+        else:
+            self.optimizer = optimizer
+        df = self.dataset.to_trajectories()
+        train_set, _ = train_test_split(
+            df, trajectory_column=self.dataset.trajectory_column, test_size=0.2
+        )
+        x, _, _ = self.preprocess(train_set)
+        # Train-valid split
+        n = x.shape[0]
+        idx = np.random.permutation(n)
+        valid_split = 0.1
+        valid_n = np.ceil(n * valid_split).astype(int)
+        valid_idx, train_idx = idx[:valid_n], idx[valid_n:]
+        x_train, x_valid = x[train_idx, :], x[valid_idx, :]
+        # build the network
+        self.gen, self.dis, self.gan = build_gan(self.optimizer, self.timesteps, self.vocab_sizes)
+        exp_name = f"{type(self).__name__}"
+        hparams = dict(epochs=epochs, batch_size=batch_size, latent_dim=latent_dim)
+        self.log_start(exp_name, **hparams)
+        train(exp_name, self.gen, self.dis, self.gan, x_train, x_valid, self.vocab_sizes, **hparams)
+        self.log_end(exp_name)
+        self.save()
+
+    # TODO: abstract these methods into a base class.
+    def log_start(self, exp_name, **hparams):
+        self.start_time = datetime.now()
+        LOG.info(f"Running experiment {exp_name} with hparams: {hparams}")
+
+    def log_end(self, exp_name):
+        self.end_time = datetime.now()
+        self.duration = self.end_time - self.start_time
+        LOG.info(f"Experiment {exp_name} for model {model_name} finished in {duration}")
+
+    def save(self, save_path: os.PathLike):
+        """Serialize the model to a checkpoint on disk."""
+        # TODO: serialize fitted model components and state.
+
+    def restore(self, save_path: os.PathLike):
+        """Restore the model from a checkpoint on disk."""
+        # TODO
+
+    def generate(self, dataset: Dataset, n: int):
+        """Generate synthetic examples from this model."""
+        # TODO
 
 
 if __name__ == "__main__":

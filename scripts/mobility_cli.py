@@ -1,12 +1,34 @@
-import click
-import pandas as pd
+import logging
+import random
 import sys
+
+import click
+import numpy as np
+import pandas as pd
+from tensorflow.random import set_seed
 
 sys.path.append(".")
 from src.models import marc
 
 MODELS = ["trajgan", "marc"]
 DATASETS = ["mdc_lausanne", "foursquare_nyc", "geolife_beijing"]
+
+LOG = logging.getLogger("mobility")
+LOG.setLevel(logging.DEBUG)
+fh = logging.FileHandler("mobility.log")
+fh.setLevel(logging.DEBUG)
+formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+fh.setFormatter(formatter)
+LOG.addHandler(fh)
+
+SEED = 11
+
+
+def set_seeds(seed):
+    """Set random seed for Python, NumPy and TensorFlow"""
+    np.random.seed(seed)
+    set_seed(seed)
+    random.seed(seed)
 
 
 @click.command()
