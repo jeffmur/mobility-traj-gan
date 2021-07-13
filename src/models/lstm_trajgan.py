@@ -21,6 +21,7 @@ from tensorflow.keras import initializers, layers, losses, optimizers, regulariz
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 
 from src.datasets import Dataset
+from src.models import Generative
 from src.processors import GPSNormalizer
 
 SEED = 11
@@ -287,13 +288,13 @@ def split_inputs(x, vocab_sizes):
     start = 2
     for val in vocab_sizes.values():
         x_split.append(x[:, :, start : (start + val)])
-        start = start + val
+        start += val
     # append mask
     x_split.append(x[:, :, [-1]])
     return x_split
 
 
-def train(
+def train_model(
     exp_name,
     gen,
     dis,
@@ -428,46 +429,26 @@ def run():
     valid_n = np.ceil(n * valid_split).astype(int)
     valid_idx, train_idx = idx[:valid_n], idx[valid_n:]
     x_train, x_valid = x[train_idx, :], x[valid_idx, :]
-    train(exp_name, gen, dis, gan, x_train, x_valid, vocab_sizes, epochs=epochs)
+    train_model(exp_name, gen, dis, gan, x_train, x_valid, vocab_sizes, epochs=epochs)
     return gen, dis, gan
 
 
-def train_test_split(df: pd.DataFrame, trajectory_column: str = "tid", test_size: float = 0.2):
-    """Split the dataset into train and test sets.
-
-    Use a group shuffle split to assign each trajectory to either
-    the train set or the test set.
-
-    Parameters
-    ----------
-    trajectory_column : str
-        The column in the dataset that represents the trajectory ID, to randomize by.
-    test_size : float
-        The ratio of the data that should be assigned to the test set.
-    """
-    train_inds, test_inds = next(
-        GroupShuffleSplit(test_size=test_size, n_splits=2).split(df, groups=df[trajectory_column])
-    )
-    train_set = df.iloc[train_inds]
-    test_set = df.iloc[test_inds]
-    return train_set, test_set
-
-
-# TODO: make this into a model class
-
-
-class LSTMTrajGAN:
+class LSTMTrajGAN(Generative):
     """An LSTM-based Trajectory Generative Adversarial Network.
 
     Based on: Rao, J., Gao, S.*, Kang, Y. and Huang, Q. (2020).
     LSTM-TrajGAN: A Deep Learning Approach to Trajectory Privacy Protection.
     In the Proceedings of the 11th International Conference on Geographic
+
     Information Science (GIScience 2021), pp. 1-16.
     """
 
     def __init__(self, dataset: Dataset):
         self.dataset = dataset
         self.vocab_sizes = dataset.get_vocab_sizes()
+        self.start_time = None
+        self.end_time = None
+        self.duration = None
         self.gps_normalizer = GPSNormalizer()
         self.encoders = []
         self.timesteps = None
@@ -475,11 +456,8 @@ class LSTMTrajGAN:
         self.gen = None
         self.dis = None
         self.gan = None
-        self.start_time = None
-        self.end_time = None
-        self.duration = None
 
-    def train_test_split(self, test_size: float = 0.2):
+    def train_test_split(self, df: pd.DataFrame, test_size: float = 0.2):
         """Split the dataset into train and test sets.
 
         Use a group shuffle split to assign each trajectory to either
@@ -490,7 +468,6 @@ class LSTMTrajGAN:
         test_size : float
             The ratio of the data that should be assigned to the test set.
         """
-        df = self.dataset.to_trajectories(min_points=10)
         train_inds, test_inds = next(
             GroupShuffleSplit(test_size=test_size, n_splits=2).split(
                 df, groups=df[self.dataset.trajectory_column]
@@ -534,23 +511,28 @@ class LSTMTrajGAN:
         tid_dfs = [df.iloc[g] for g in tid_groups.values()]
         # label is a y-variable, split it into a separate vector
         labels = np.array([tdf[self.dataset.label_column].values[0] for tdf in tid_dfs])
-        # get percentile of sequence length
-        x_lengths = sorted([len(l) for l in tid_dfs])
-        pct_idx = round(len(x_lengths) * max_len_qtile)
-        maxlen = x_lengths[pct_idx]
+        if train:
+            # get percentile of sequence length
+            x_lengths = sorted([len(l) for l in tid_dfs])
+            pct_idx = round(len(x_lengths) * max_len_qtile)
+            maxlen = x_lengths[pct_idx]
+            self.timesteps = maxlen
         x_nested = [tdf.iloc[:, 2:].to_numpy() for tdf in tid_dfs]
         x_pad = pad_sequences(
-            x_nested, maxlen=maxlen, padding=padding, truncating=padding, value=0.0, dtype="float32"
+            x_nested,
+            maxlen=self.timesteps,
+            padding=padding,
+            truncating=padding,
+            value=0.0,
+            dtype="float32",
         )
         # add mask vector
         mask = np.expand_dims((x_pad[:, :, 0] != 0.0).astype("float32"), axis=2)
         x_pad = np.concatenate([x_pad, mask], axis=2)
-        self.timesteps = maxlen
         return x_pad, labels, tids
 
     def postprocess(self, x: np.array, y: np.array, tids: np.array):
         """Convert the tensor representation back to a data frame of GPS records."""
-        # TODO: some of the trajectories are coming out with differences.
         tids = np.repeat(np.expand_dims(tids, axis=1), x.shape[1], axis=1).reshape(
             x.shape[0] * x.shape[1]
         )
@@ -587,13 +569,10 @@ class LSTMTrajGAN:
     ):
         """Train this model on a dataset."""
         if optimizer is None:
-            self.optimizer = optimizers.Adam(0.001, 0.5)
-        else:
-            self.optimizer = optimizer
+            optimizer = optimizers.Adam(0.001, 0.5)
+        self.optimizer = optimizer
         df = self.dataset.to_trajectories(min_points=10)
-        train_set, _ = train_test_split(
-            df, trajectory_column=self.dataset.trajectory_column, test_size=0.2
-        )
+        train_set, _ = self.train_test_split(df, test_size=test_size)
         x, _, _ = self.preprocess(train_set)
         # Train-valid split
         n = x.shape[0]
@@ -607,11 +586,26 @@ class LSTMTrajGAN:
         exp_name = f"{type(self).__name__}"
         hparams = dict(epochs=epochs, batch_size=batch_size, latent_dim=latent_dim)
         self.log_start(exp_name, **hparams)
-        train(exp_name, self.gen, self.dis, self.gan, x_train, x_valid, self.vocab_sizes, **hparams)
+        train_model(
+            exp_name,
+            self.gen,
+            self.dis,
+            self.gan,
+            x_train,
+            x_valid,
+            self.vocab_sizes,
+            patience=patience,
+            **hparams,
+        )
         self.log_end(exp_name)
         self.save(f"experiments/{exp_name}")
 
-    # TODO: abstract these methods into a base class.
+    def save(self, save_path: os.PathLike):
+        """Serialize the model to a checkpoint on disk."""
+
+    def restore(self, save_path: os.PathLike):
+        """Restore the model from a checkpoint on disk."""
+
     def log_start(self, exp_name, **hparams):
         self.start_time = datetime.now()
         LOG.info(f"Running experiment {exp_name} with hparams: {hparams}")
@@ -620,19 +614,3 @@ class LSTMTrajGAN:
         self.end_time = datetime.now()
         self.duration = self.end_time - self.start_time
         LOG.info(f"Experiment {exp_name} finished in {self.duration}")
-
-    def save(self, save_path: os.PathLike):
-        """Serialize the model to a checkpoint on disk."""
-        # TODO: serialize fitted model components and state.
-
-    def restore(self, save_path: os.PathLike):
-        """Restore the model from a checkpoint on disk."""
-        # TODO
-
-    def generate(self, dataset: Dataset, n: int):
-        """Generate synthetic examples from this model."""
-        # TODO
-
-
-# if __name__ == "__main__":
-#    run()

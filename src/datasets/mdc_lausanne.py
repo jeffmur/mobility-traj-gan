@@ -2,15 +2,13 @@
 
 The MDC dataset filtered to the city limits of Lausanne, CH.
 """
-from logging import Logger
-import abc
 import os
+from logging import Logger
 from pathlib import Path
 
 import pandas as pd
-
+from src import config, freq_matrix, preprocess
 from src.datasets import Dataset
-from src.lib import config, preprocess, freq_matrix
 
 LOG = Logger(__name__)
 
@@ -18,10 +16,13 @@ LOG = Logger(__name__)
 class MDCLausanne(Dataset):
     """The Mobility Data Challenge (MDC) dataset filtered to Lausanne, CH."""
 
-    def __init__(self, raw_data_path):
-        self.city_name = config.CITY
+    def __init__(
+        self, raw_data_path: os.PathLike, processed_file: os.PathLike = "data/mdc_lausanne.csv"
+    ):
+        self.city_name = "Lausanne, District de Lausanne, Vaud, Switzerland"
         self.bounding_box = preprocess.fetch_geo_location(self.city_name)
         self.raw_data_path = Path(raw_data_path)
+        self.processed_file = Path(processed_file)
         self.raw_columns = [
             "rid",
             "unix",
@@ -38,11 +39,12 @@ class MDCLausanne(Dataset):
         ]
         self.label_column = "label"
         self.trajectory_column = "tid"
+        self.datetime_column = "datetime"
         self.lat_column = "lat"
         self.lon_column = "lon"
         self.columns = [self.label_column, self.trajectory_column, self.lat_column, self.lon_column]
 
-    def preprocess(self, output_file: os.PathLike = "data/mdc_lausanne.csv"):
+    def preprocess(self):
         """Preprocess the raw data into a single CSV file of trajectory data.
 
         Long-running (takes a few minutes).
@@ -53,11 +55,10 @@ class MDCLausanne(Dataset):
             The file path to save the processed CSV data.
         """
 
-        if os.path.exists(output_file):
-            df = pd.read_csv(output_file)
+        if os.path.exists(self.processed_file):
+            df = pd.read_csv(self.processed_file)
             df.datetime = pd.to_datetime(df.datetime)
             return df
-        output_file = Path(output_file)
         raw_gps = self.raw_data_path / "gps.csv"
         raw_records = self.raw_data_path / "records.csv"
         # Read in raw gps
@@ -83,56 +84,6 @@ class MDCLausanne(Dataset):
         df = df.join(df_rec, how="inner").reset_index()
         df = df.drop_duplicates(subset=["rid"])
         df = df[self.columns]
-        df.to_csv(output_file, index=False)
-        LOG.info("Preprocessed data written to: %s", output_file)
+        df.to_csv(self.processed_file, index=False)
+        LOG.info("Preprocessed data written to: %s", self.processed_file)
         return df
-
-    def to_trajectories(self, min_points: int = 2):
-        """Return the dataset as a Pandas DataFrame split into user-week trajectories.
-
-        Multiple points within a ten minute interval will be removed.
-
-        Parameters
-        ----------
-        min_points : int
-            The minimum number of location points (rows) in a
-            trajectory to include it in the dataset.
-        """
-
-        df = self.preprocess()
-        df = df.sort_values(["label", "datetime"])
-        df["year"] = df["datetime"].dt.year
-        df["month"] = df["datetime"].dt.month
-        df["day"] = df["datetime"].dt.day
-        df["weekday"] = df["datetime"].dt.weekday
-        df["hour"] = df["datetime"].dt.hour
-        df["minute"] = df["datetime"].dt.minute
-        df["week"] = df["datetime"].dt.isocalendar().week
-        df["tenminute"] = (df["datetime"].dt.minute // 10 * 10).astype(int)
-        df = (
-            df.groupby(
-                [self.label_column, "year", "month", "week", "day", "weekday", "hour", "tenminute"]
-            )
-            .agg({"lat": "mean", "lon": "mean"})
-            .reset_index()
-        )
-        # filter out trajectories with fewer than min points
-        df = (
-            df.groupby(["label", "year", "week"])
-            .filter(lambda x: len(x) >= min_points)
-            .reset_index()
-        )
-        df[self.trajectory_column] = df.groupby([self.label_column, "year", "week"]).ngroup()
-        df = df[[self.label_column, self.trajectory_column, "lat", "lon", "weekday", "hour"]]
-
-        return df
-
-    def get_vocab_sizes(self):
-        """Get a dictionary of categorical features and their cardinalities."""
-        df = self.to_trajectories()
-        return (
-            df.drop([self.label_column, self.trajectory_column], axis=1, errors="ignore")
-            .select_dtypes("int")
-            .nunique()
-            .to_dict()
-        )

@@ -6,9 +6,13 @@ from: https://github.com/bigdata-ufsc/petry-2020-marc
 import geohash2 as gh
 import numpy as np
 import pandas as pd
-from sklearn.preprocessing import LabelEncoder, OneHotEncoder
+from sklearn.model_selection import StratifiedShuffleSplit
+from sklearn.preprocessing import OrdinalEncoder, OneHotEncoder
 from tensorflow.keras import Model, initializers, layers, optimizers, regularizers
 from tensorflow.keras.preprocessing.sequence import pad_sequences
+
+from src.datasets import Dataset
+from src.processors import GPSGeoHasher
 
 base32 = [
     *[str(i) for i in range(0, 10)],
@@ -44,87 +48,8 @@ def bin_geohash(lat, lon, precision=15):
     return np.concatenate([base32toBin[x] for x in hashed])
 
 
-def get_trajectories(df_train, df_test, tid_col="tid", label_col="label", geo_precision=8):
-    df = df_train.copy().append(df_test)
-    tids_train = df_train[tid_col].unique()
-    keys = list(df_train.keys())
-    vocab_size = {}
-    keys.remove(tid_col)
-    num_classes = df[label_col].nunique()
-    lat_lon = False
-
-    if "lat" in keys and "lon" in keys:
-        keys.remove("lat")
-        keys.remove("lon")
-        lat_lon = True
-
-    for attr in keys:
-        # This is a bad practice because encoder is being fitted on the test set
-        lab_enc = LabelEncoder()
-        df[attr] = lab_enc.fit_transform(df[attr])
-
-        if attr != label_col:
-            vocab_size[attr] = max(df[attr]) + 1
-
-    keys.remove(label_col)
-
-    x = [[] for key in keys]
-    y = []
-    idx_train = []
-    idx_test = []
-    max_length = 0
-
-    if lat_lon:
-        x.append([])
-
-    for idx, tid in enumerate(df[tid_col].unique()):
-        traj = df.loc[df[tid_col].isin([tid])]
-        features = np.transpose(traj.loc[:, keys].values)
-
-        for i, feature in enumerate(features):
-            x[i].append(feature)
-
-        if lat_lon:
-            loc_list = []
-            for i in range(0, len(traj)):
-                lat = traj["lat"].values[i]
-                lon = traj["lon"].values[i]
-                loc_list.append(bin_geohash(lat, lon, geo_precision))
-            x[-1].append(loc_list)
-
-        label = traj[label_col].iloc[0]
-        y.append(label)
-
-        if tid in tids_train:
-            idx_train.append(idx)
-        else:
-            idx_test.append(idx)
-
-        if traj.shape[0] > max_length:
-            max_length = traj.shape[0]
-
-    if lat_lon:
-        keys.append("lat_lon")
-        vocab_size["lat_lon"] = geo_precision * 5
-
-    one_hot_y = OneHotEncoder().fit(df.loc[:, [label_col]])
-
-    x = [np.asarray(f) for f in x]
-    y = one_hot_y.transform(pd.DataFrame(y)).toarray()
-
-    x_train = np.asarray([f[idx_train] for f in x])
-    y_train = y[idx_train]
-    x_test = np.asarray([f[idx_test] for f in x])
-    y_test = y[idx_test]
-
-    x_train_pad = [pad_sequences(f, max_length, padding="pre") for f in x_train]
-    x_test_pad = [pad_sequences(f, max_length, padding="pre") for f in x_test]
-
-    return (vocab_size, num_classes, max_length, x_train_pad, y_train, x_test_pad, y_test)
-
-
 def build_classifier(
-    vocab_size, timesteps, num_classes, embedder_size=100, hidden_units=100, dropout=0.5
+    optimizer, vocab_size, timesteps, num_classes, embedder_size=100, hidden_units=100, dropout=0.5
 ):
     """Build the classifier Keras model."""
     inputs = []
@@ -161,31 +86,13 @@ def build_classifier(
     )(rnn_dropout)
 
     classifier = Model(inputs=inputs, outputs=softmax)
-    opt = optimizers.Adam(lr=0.001)
 
     classifier.compile(
-        optimizer=opt,
+        optimizer=optimizer,
         loss="categorical_crossentropy",
         metrics=["acc", "top_k_categorical_accuracy"],
     )
     return classifier
-
-
-def train(train_df, test_df, epochs):
-    """Train the MARC trajectory classifier model."""
-    vocab_size, num_classes, timesteps, x_train, y_train, x_test, y_test = get_trajectories(
-        train_df, test_df
-    )
-    model = build_classifier(vocab_size, timesteps, num_classes)
-    model.fit(
-        x=x_train,
-        y=y_train,
-        validation_data=(x_test, y_test),
-        batch_size=64,
-        shuffle=True,
-        epochs=epochs,
-        callbacks=[],  # TODO: Early Stopping callback
-    )
 
 
 class MARC:
@@ -196,3 +103,124 @@ class MARC:
     and semantic embeddings.
     International Journal of Geographical Information Science, 34(7), 1428-1450.
     """
+
+    def __init__(self, dataset: Dataset, geohash_precision: int = 8):
+        self.dataset = dataset
+        self.geohasher = GPSGeoHasher(precision=geohash_precision)
+        self.geohash_dim = geohash_precision * 5
+        self.y_encoder = OneHotEncoder(sparse=False)
+        self.encoders = []
+        self.vocab_sizes = None
+        self.timesteps = None
+        self.num_classes = None
+        self.optimizer = None
+        self.classifier = None
+
+    def train_test_split(self, df: pd.DataFrame, test_size: float = 0.2):
+        """Split the dataset into train and test sets.
+
+        Use a stratified split on label to balance label classes across the
+        test and train sets.
+
+        Parameters
+        ----------
+        test_size : float
+            The ratio of the data that should be assigned to the test set.
+        """
+        ids = df[[self.dataset.label_column, self.dataset.trajectory_column]].drop_duplicates()
+        ids = ids.groupby("label").filter(lambda x: len(x) > 1)
+        split = StratifiedShuffleSplit(test_size=test_size, n_splits=2).split(
+            ids, ids[self.dataset.label_column]
+        )
+        train_tids, test_tids = next(split)
+        train_set = df[df[self.dataset.trajectory_column].isin(train_tids)]
+        test_set = df[df[self.dataset.trajectory_column].isin(test_tids)]
+        return train_set, test_set
+
+    def preprocess(
+        self,
+        data: pd.DataFrame,
+        train: bool = True,
+        max_len_qtile: float = 0.95,
+        padding: str = "pre",
+    ):
+        """Transform trajectories DataFrame to a NumPy tensor with zero padding."""
+        df = data.copy()
+        latlon_cols = [self.dataset.lat_column, self.dataset.lon_column]
+        if train:
+            self.geohasher.fit(df.loc[:, latlon_cols])
+            self.y_encoder.fit(df.loc[:, [self.dataset.label_column]])
+
+        latlon_hashed = pd.DataFrame(
+            self.geohasher.transform(df.loc[:, latlon_cols].to_numpy()),
+            columns=[f"latlon_{i}" for i in range(self.geohash_dim)],
+        )
+        encoded_features = []
+        vocab_sizes = self.dataset.get_vocab_sizes()
+        self.vocab_sizes = {**vocab_sizes, "lat_lon": self.geohash_dim}
+        for feature in vocab_sizes:
+            encoder = OrdinalEncoder()
+            if train:
+                encoder.fit(df[[feature]])
+            feat_enc = pd.DataFrame(
+                encoder.transform(df[[feature]]),
+                columns=[feature],
+            )
+            self.encoders.append(encoder)
+            encoded_features.append(feat_enc)
+        df = df.reset_index().drop("index", errors="ignore", axis=1)
+        df = df.drop(vocab_sizes.keys(), axis=1)
+        df = df.drop(latlon_cols, axis=1)
+        df = pd.concat([df, latlon_hashed, *encoded_features], axis=1)
+        tids = df[self.dataset.trajectory_column].unique()
+        tid_groups = df.groupby(self.dataset.trajectory_column).groups
+        tid_dfs = [df.iloc[g] for g in tid_groups.values()]
+        labels = self.y_encoder.transform(df.loc[:, [self.dataset.label_column]])
+        self.num_classes = labels.shape[1]
+        if train:
+            # get percentile of sequence length
+            x_lengths = sorted([len(l) for l in tid_dfs])
+            pct_idx = round(len(x_lengths) * max_len_qtile)
+            maxlen = x_lengths[pct_idx]
+            self.timesteps = maxlen
+        x_nested = [tdf.iloc[:, 2:].to_numpy() for tdf in tid_dfs]
+        x_pad = pad_sequences(
+            x_nested,
+            maxlen=self.timesteps,
+            padding=padding,
+            truncating=padding,
+            value=0.0,
+            dtype="float32",
+        )
+        # split into one input per feature
+        x_split = []
+        for i, key in enumerate(self.vocab_sizes):
+            if key == "lat_lon":
+                x_split.append(x_pad[:, :, i : i + self.geohash_dim])
+            else:
+                x_split.append(x_pad[:, :, i])
+        return x_split, labels, tids
+
+    def train(
+        self, optimizer=None, epochs: int = 200, batch_size: int = 64, test_size: float = 0.2
+    ):
+        """Train this model on the dataset."""
+        if optimizer is None:
+            optimizer = optimizers.Adam()
+        self.optimizer = optimizer
+        df = self.dataset.to_trajectories(min_points=10)
+        train_set, _ = self.train_test_split(df, test_size=test_size)
+        x_train, y_train, _ = self.preprocess(train_set)
+        self.classifier = build_classifier(
+            self.optimizer, self.vocab_sizes, self.timesteps, self.num_classes
+        )
+
+        self.classifier.fit(
+            x=x_train,
+            y=y_train,
+            validation_split=0.1,
+            batch_size=batch_size,
+            shuffle=True,
+            epochs=epochs,
+            callbacks=[],  # TODO: Early Stopping callback
+        )

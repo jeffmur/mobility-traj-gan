@@ -3,7 +3,7 @@ import sys
 sys.path.append(".")
 from pathlib import Path
 import pandas as pd
-from src.lib import config, freq_matrix, preprocess
+from src import config, freq_matrix, preprocess
 
 """
 Purpose: Generate Frequency Matrix for all users within a dataset

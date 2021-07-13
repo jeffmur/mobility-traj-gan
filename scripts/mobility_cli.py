@@ -37,6 +37,7 @@ def set_seeds(seed):
 @click.argument("epochs", type=click.INT)
 def train(model):
     """Train MODEL on DATASET for EPOCHS"""
+    # TODO
 
 
 @click.command()
@@ -51,6 +52,7 @@ def train(model):
 )
 def generate(saved_model, dataset, output_path, n):
     """Use SAVED_MODEL to generate NUM trajectories based on DATASET and write to OUTPUT_PATH as CSV."""
+    # TODO
 
 
 @click.command()
@@ -58,6 +60,7 @@ def generate(saved_model, dataset, output_path, n):
 @click.argument("dataset", type=click.Choice(DATASETS))
 def predict():
     """Use SAVED_MODEL to predict the labels of DATASET."""
+    # TODO
 
 
 @click.command()
@@ -68,9 +71,7 @@ def predict():
 def train_marc(train_file, test_file, result_file, epochs):
     """Train the MARC trajectory-user linking classifier."""
 
-    train_df = pd.read_csv(train_file)
-    test_df = pd.read_csv(test_file)
-    marc.train(train_df, test_df, epochs)
+    # TODO
 
 
 @click.group()

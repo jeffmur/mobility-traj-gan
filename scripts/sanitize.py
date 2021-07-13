@@ -13,7 +13,7 @@ from pathlib import Path
 
 sys.path.append(".")
 import pandas as pd
-from src.lib import config
+from src import config
 
 ## Paths : TO CHANGE FOR LOCAL SETUP ## TODO
 # raw gps.csv file in mdc

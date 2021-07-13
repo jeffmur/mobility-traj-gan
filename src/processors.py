@@ -36,6 +36,7 @@ class GPSGeoHasher(TransformerMixin, BaseEstimator):
 
     def fit(self, _):
         """Fit parameters to the data."""
+        return self
 
     def transform(self, X):
         """Transform the data."""

@@ -1,7 +1,7 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import math
-import src.lib.preprocess as pre
+import src.preprocess as pre
 import numpy as np
 
 

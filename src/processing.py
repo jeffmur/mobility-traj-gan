@@ -4,7 +4,7 @@ import numpy as np
 import pandas as pd
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import MinMaxScaler, OrdinalEncoder, OneHotEncoder
-from src.lib import config, freq_matrix, preprocess
+from src import config, freq_matrix, preprocess
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 from tensorflow.keras.utils import to_categorical
 
