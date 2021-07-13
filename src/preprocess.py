@@ -10,7 +10,7 @@ from datetime import datetime
 ## Raw Data Processing ##
 
 
-def unixToTimeStamp(df):
+def unix_to_timestamp(df):
     """
     Convert Unix TimeStamp to Date, Time and append columns to dataframe
 
@@ -19,10 +19,7 @@ def unixToTimeStamp(df):
     :param: Dataframe w/ Unix Column Label
     """
     series = df.Unix[:]
-    uTD = [
-        datetime.utcfromtimestamp(int(ts)).strftime("%Y-%m-%d %H:%M:%S")
-        for ts in series
-    ]
+    uTD = [datetime.utcfromtimestamp(int(ts)).strftime("%Y-%m-%d %H:%M:%S") for ts in series]
     df["Date"] = [i.split(" ", 1)[0] for i in uTD]
     df["Time"] = [i.split(" ", 1)[1] for i in uTD]
     df.drop(["Unix"], 1)
@@ -30,7 +27,7 @@ def unixToTimeStamp(df):
     return df
 
 
-def removeSpaces(toRemove, toSave):
+def remove_spaces(toRemove, toSave):
     """
     Remove extra spaces in src file,
     Then saves to dst file.
@@ -53,7 +50,7 @@ def removeSpaces(toRemove, toSave):
 ## Formatted Data Processing ##
 
 
-def toPandas(pathToFile, nameSpace, delim):
+def to_pandas(pathToFile, nameSpace, delim):
     """
     Returns dataframe with labeled header
 
@@ -68,7 +65,7 @@ def toPandas(pathToFile, nameSpace, delim):
     return df
 
 
-def fetchGeoLocation(cityCountry):
+def fetch_geo_location(cityCountry):
     """
     Using Nominatim OpenAPI to fetch Longitude and Latitude Data
     :return: [south Latitude
@@ -86,7 +83,7 @@ def fetchGeoLocation(cityCountry):
     return location["boundingbox"]
 
 
-def dropOutlyingData(df, boundingbox):
+def drop_outlying_data(df, boundingbox):
     """
     Remove data outside of bounding box longitude and latitude.
 
@@ -119,10 +116,7 @@ def haversine_distance(lat1, lon1, lat2, lon2):
     phi2 = m.radians(lat2)
     delta_phi = m.radians(lat2 - lat1)
     delta_lambda = m.radians(lon2 - lon1)
-    a = (
-        np.sin(delta_phi / 2) ** 2
-        + np.cos(phi1) * np.cos(phi2) * np.sin(delta_lambda / 2) ** 2
-    )
+    a = np.sin(delta_phi / 2) ** 2 + np.cos(phi1) * np.cos(phi2) * np.sin(delta_lambda / 2) ** 2
     res = r * (2 * np.arctan2(np.sqrt(a), np.sqrt(1 - a)))
     return np.round(res, 2) * 0.62137  # 1km to miles
 
