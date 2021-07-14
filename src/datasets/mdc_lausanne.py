@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pandas as pd
 from src import config, freq_matrix, preprocess
-from src.datasets import Dataset
+from src.datasets.base import Dataset
 
 LOG = Logger(__name__)
 

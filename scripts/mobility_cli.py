@@ -8,10 +8,8 @@ import pandas as pd
 from tensorflow.random import set_seed
 
 sys.path.append(".")
-from src.models import marc
-
-MODELS = ["trajgan", "marc"]
-DATASETS = ["mdc_lausanne", "foursquare_nyc", "geolife_beijing"]
+from src import models
+from src import datasets
 
 LOG = logging.getLogger("mobility")
 LOG.setLevel(logging.DEBUG)
@@ -21,7 +19,8 @@ formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(messag
 fh.setFormatter(formatter)
 LOG.addHandler(fh)
 
-SEED = 11
+DATASET_CHOICES = {klass.__name__: klass for klass in datasets.DATASETS}
+MODEL_CHOICES = {klass.__name__: klass for klass in models.MODELS}
 
 
 def set_seeds(seed):
@@ -32,17 +31,8 @@ def set_seeds(seed):
 
 
 @click.command()
-@click.argument("model", type=click.Choice(MODELS))
-@click.argument("dataset", type=click.Choice(DATASETS))
-@click.argument("epochs", type=click.INT)
-def train(model):
-    """Train MODEL on DATASET for EPOCHS"""
-    # TODO
-
-
-@click.command()
 @click.argument("saved_model", type=click.Path(exists=True, file_okay=False))
-@click.argument("dataset", type=click.Choice(DATASETS))
+@click.argument("dataset", type=click.Choice(DATASET_CHOICES))
 @click.argument("output_path", type=click.Path(dir_okay=False))
 @click.option(
     "--n",
@@ -57,21 +47,22 @@ def generate(saved_model, dataset, output_path, n):
 
 @click.command()
 @click.argument("saved_model", type=click.Path(exists=True, file_okay=False))
-@click.argument("dataset", type=click.Choice(DATASETS))
+@click.argument("dataset", type=click.Choice(DATASET_CHOICES))
 def predict():
     """Use SAVED_MODEL to predict the labels of DATASET."""
     # TODO
 
 
 @click.command()
-@click.argument("train_file", type=click.Path(exists=True))
-@click.argument("test_file", type=click.Path(exists=True))
-@click.argument("result_file", type=click.Path())
+@click.argument("model", type=click.Choice(MODEL_CHOICES.keys()))
+@click.argument("dataset", type=click.Choice(DATASET_CHOICES.keys()))
+@click.argument("dataset_path", type=click.Path(exists=True))
 @click.argument("epochs", type=click.INT)
-def train_marc(train_file, test_file, result_file, epochs):
-    """Train the MARC trajectory-user linking classifier."""
-
-    # TODO
+def train(model, dataset, dataset_path, epochs):
+    """Train MODEL on DATASET stored in DATASET_PATH for EPOCHS."""
+    the_dataset = DATASET_CHOICES.get(dataset)(dataset_path)
+    the_model = MODEL_CHOICES.get(model)(the_dataset)
+    the_model.train(epochs=epochs)
 
 
 @click.group()
@@ -87,4 +78,6 @@ def main():
 
 
 if __name__ == "__main__":
+    SEED = 11
+    set_seeds(SEED)
     main()
