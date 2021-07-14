@@ -3,12 +3,12 @@ GAN model
 Rewrite of LSTM-TrajGAN for TF2
 """
 import csv
-import datetime
 import logging
 import os
+import pickle
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict
+from typing import Dict
 
 import numpy as np
 import pandas as pd
@@ -17,11 +17,12 @@ from sklearn.model_selection import GroupShuffleSplit
 from sklearn.preprocessing import OneHotEncoder
 from tensorflow.keras import Model
 from tensorflow.keras import backend as K
-from tensorflow.keras import initializers, layers, losses, optimizers, regularizers
+from tensorflow.keras import initializers, layers, optimizers, regularizers
+from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 
+from src.models.base import Generative, log_start, log_end
 from src.datasets import Dataset
-from src.models import Generative
 from src.processors import GPSNormalizer
 
 SEED = 11
@@ -306,9 +307,11 @@ def train_model(
     batch_size=256,
     latent_dim=100,
     patience=10,
+    start_time=None,
 ):
     """Train the GAN."""
-    start_time = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+    if start_time is None:
+        start_time = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
     n_examples = x_train.shape[0]
     n_batches = np.ceil(n_examples / batch_size).astype(int)
     random_idx = np.random.permutation(x_train.shape[0])
@@ -446,16 +449,19 @@ class LSTMTrajGAN(Generative):
     def __init__(self, dataset: Dataset):
         self.dataset = dataset
         self.vocab_sizes = dataset.get_vocab_sizes()
-        self.start_time = None
-        self.end_time = None
-        self.duration = None
         self.gps_normalizer = GPSNormalizer()
         self.encoders = []
         self.timesteps = None
-        self.optimizer = None
+        self.learning_rate = None
+        self.momentum = None
+        self.latent_dim = None
+        self.batch_size = None
+        self.test_size = None
+        self.patience = None
         self.gen = None
         self.dis = None
         self.gan = None
+        self.trained_epochs = 0
 
     def train_test_split(self, df: pd.DataFrame, test_size: float = 0.2):
         """Split the dataset into train and test sets.
@@ -560,17 +566,22 @@ class LSTMTrajGAN(Generative):
 
     def train(
         self,
-        optimizer=None,
         epochs: int = 200,
         batch_size: int = 256,
         latent_dim: int = 100,
+        learning_rate: float = 0.001,
+        momentum: float = 0.5,
         test_size: float = 0.2,
         patience: int = 10,
     ):
         """Train this model on a dataset."""
-        if optimizer is None:
-            optimizer = optimizers.Adam(0.001, 0.5)
-        self.optimizer = optimizer
+        self.batch_size = batch_size
+        self.latent_dim = latent_dim
+        self.learning_rate = learning_rate
+        self.momentum = momentum
+        self.test_size = test_size
+        self.patience = patience
+        optimizer = optimizers.Adam(learning_rate, momentum)
         df = self.dataset.to_trajectories(min_points=10)
         train_set, _ = self.train_test_split(df, test_size=test_size)
         x, _, _ = self.preprocess(train_set)
@@ -582,10 +593,12 @@ class LSTMTrajGAN(Generative):
         valid_idx, train_idx = idx[:valid_n], idx[valid_n:]
         x_train, x_valid = x[train_idx, :], x[valid_idx, :]
         # build the network
-        self.gen, self.dis, self.gan = build_gan(self.optimizer, self.timesteps, self.vocab_sizes)
+        self.gen, self.dis, self.gan = build_gan(optimizer, self.timesteps, self.vocab_sizes)
         exp_name = f"{type(self).__name__}"
         hparams = dict(epochs=epochs, batch_size=batch_size, latent_dim=latent_dim)
-        self.log_start(exp_name, **hparams)
+        start_time = log_start(LOG, exp_name, **hparams)
+        start_time_str = start_time.strftime("%Y-%m-%dT%H:%M:%S")
+        exp_path = Path(f"experiments/{exp_name}/{start_time_str}")
         train_model(
             exp_name,
             self.gen,
@@ -595,22 +608,54 @@ class LSTMTrajGAN(Generative):
             x_valid,
             self.vocab_sizes,
             patience=patience,
+            start_time=start_time_str,
             **hparams,
         )
-        self.log_end(exp_name)
-        self.save(f"experiments/{exp_name}")
+        self.trained_epochs += epochs
+        log_end(LOG, exp_name, start_time)
+        self.save(f"{exp_path}/saved_model")
 
     def save(self, save_path: os.PathLike):
-        """Serialize the model to a checkpoint on disk."""
+        """Serialize the model to a directory on disk."""
+        os.makedirs(save_path, exist_ok=True)
+        save_path = Path(save_path)
+        pickle.dump(self.dataset, save_path / "dataset.pkl")
+        hparams = dict(
+            latent_dim=self.latent_dim,
+            batch_size=self.batch_size,
+            learning_rate=self.learning_rate,
+            momentum=self.momentum,
+        )
+        if self.trained_epochs > 0:
+            pickle.dump(self.encoders, save_path / "encoders.pkl")
+            pickle.dump(self.gps_normalizer, save_path / "gps_normalizer.pkl")
+            self.gen.save(save_path / "generator_model")
+            self.dis.save(save_path / "discriminator_model")
+            self.gan.save(save_path / "gan_model")
+            train_state = dict(
+                patience=self.patience,
+                trained_epochs=self.trained_epochs,
+                timesteps=self.timesteps,
+                vocab_sizes=self.vocab_sizes,
+            )
+            pickle.dump(train_state, save_path / "train_state.pkl")
+        pickle.dump(hparams, save_path / "hparams.pkl")
 
-    def restore(self, save_path: os.PathLike):
+        return self
+
+    @classmethod
+    def restore(cls, save_path: os.PathLike):
         """Restore the model from a checkpoint on disk."""
-
-    def log_start(self, exp_name, **hparams):
-        self.start_time = datetime.now()
-        LOG.info(f"Running experiment {exp_name} with hparams: {hparams}")
-
-    def log_end(self, exp_name):
-        self.end_time = datetime.now()
-        self.duration = self.end_time - self.start_time
-        LOG.info(f"Experiment {exp_name} finished in {self.duration}")
+        save_path = Path(save_path)
+        dataset = pickle.load(save_path / "dataset.pkl")
+        model = cls(dataset)
+        model.gen = load_model(save_path / "generator_model")
+        model.dis = load_model(save_path / "discriminator_model")
+        model.gan = load_model(save_path / "gan_model")
+        model.encoders = pickle.load(save_path / "encoders.pkl")
+        model.gps_normalizer = pickle.load(save_path / "gps_normalizer.pkl")
+        hparams = pickle.load(save_path / "hparams.pkl")
+        train_state = pickle.load(save_path / "train_state.pkl")
+        for key, val in {**hparams, **train_state}:
+            setattr(model, key, val)
+        return model
