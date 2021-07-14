@@ -651,6 +651,6 @@ class LSTMTrajGAN(TrajectoryModel):
         model.gps_normalizer = joblib.load(save_path / "gps_normalizer.pkl")
         hparams = joblib.load(save_path / "hparams.pkl")
         train_state = joblib.load(save_path / "train_state.pkl")
-        for key, val in {**hparams, **train_state}:
+        for key, val in {**hparams, **train_state}.items():
             setattr(model, key, val)
         return model

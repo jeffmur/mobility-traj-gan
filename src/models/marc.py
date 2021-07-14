@@ -295,6 +295,6 @@ class MARC(TrajectoryModel):
         model.y_encoder = joblib.load(save_path / "y_encoder.pkl")
         hparams = joblib.load(save_path / "hparams.pkl")
         train_state = joblib.load(save_path / "train_state.pkl")
-        for key, val in {**hparams, **train_state}:
+        for key, val in {**hparams, **train_state}.items():
             setattr(model, key, val)
         return model
