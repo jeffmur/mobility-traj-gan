@@ -3,9 +3,9 @@
 TensorFlow 2 reimplementation of the Multi-Aspect Trajectory Classifier model
 from: https://github.com/bigdata-ufsc/petry-2020-marc
 """
+import joblib
 import logging
 import os
-import pickle
 from pathlib import Path
 
 import numpy as np
@@ -228,7 +228,7 @@ class MARC(TrajectoryModel):
             callbacks=[
                 callbacks.ModelCheckpoint(
                     exp_path / "checkpoints",
-                    save_weights_only=False,
+                    save_weights_only=True,
                     monitor="val_loss",
                     save_best_only=True,
                 ),
@@ -258,7 +258,7 @@ class MARC(TrajectoryModel):
         """Serialize the model to a directory on disk."""
         os.makedirs(save_path, exist_ok=True)
         save_path = Path(save_path)
-        pickle.dump(self.dataset, save_path / "dataset.pkl")
+        joblib.dump(self.dataset, save_path / "dataset.pkl")
         hparams = dict(
             batch_size=self.batch_size,
             learning_rate=self.learning_rate,
@@ -266,9 +266,9 @@ class MARC(TrajectoryModel):
             geohash_dim=self.geohash_dim,
         )
         if self.trained_epochs > 0:
-            pickle.dump(self.encoders, save_path / "encoders.pkl")
-            pickle.dump(self.geohasher, save_path / "geohasher.pkl")
-            pickle.dump(self.y_encoder, save_path / "y_encoder.pkl")
+            joblib.dump(self.encoders, save_path / "encoders.pkl")
+            joblib.dump(self.geohasher, save_path / "geohasher.pkl")
+            joblib.dump(self.y_encoder, save_path / "y_encoder.pkl")
             self.classifier.save(save_path / "classifier_model")
             train_state = dict(
                 trained_epochs=self.trained_epochs,
@@ -278,8 +278,8 @@ class MARC(TrajectoryModel):
                 num_classes=self.num_classes,
                 test_size=self.test_size,
             )
-            pickle.dump(train_state, save_path / "train_state.pkl")
-        pickle.dump(hparams, save_path / "hparams.pkl")
+            joblib.dump(train_state, save_path / "train_state.pkl")
+        joblib.dump(hparams, save_path / "hparams.pkl")
 
         return self
 
@@ -287,14 +287,14 @@ class MARC(TrajectoryModel):
     def restore(cls, save_path: os.PathLike):
         """Restore the model from a checkpoint on disk."""
         save_path = Path(save_path)
-        dataset = pickle.load(save_path / "dataset.pkl")
+        dataset = joblib.load(save_path / "dataset.pkl")
         model = cls(dataset)
         model.classifier = load_model(save_path / "classifier_model")
-        model.encoders = pickle.load(save_path / "encoders.pkl")
-        model.geohasher = pickle.load(save_path / "geohasher.pkl")
-        model.y_encoder = pickle.load(save_path / "y_encoder.pkl")
-        hparams = pickle.load(save_path / "hparams.pkl")
-        train_state = pickle.load(save_path / "train_state.pkl")
+        model.encoders = joblib.load(save_path / "encoders.pkl")
+        model.geohasher = joblib.load(save_path / "geohasher.pkl")
+        model.y_encoder = joblib.load(save_path / "y_encoder.pkl")
+        hparams = joblib.load(save_path / "hparams.pkl")
+        train_state = joblib.load(save_path / "train_state.pkl")
         for key, val in {**hparams, **train_state}:
             setattr(model, key, val)
         return model

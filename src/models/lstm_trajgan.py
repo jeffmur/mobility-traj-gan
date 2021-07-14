@@ -5,7 +5,7 @@ Rewrite of LSTM-TrajGAN for TF2
 import csv
 import logging
 import os
-import pickle
+import joblib
 from datetime import datetime
 from pathlib import Path
 from typing import Dict
@@ -21,7 +21,7 @@ from tensorflow.keras import initializers, layers, optimizers, regularizers
 from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 
-from src.models.base import Generative, log_start, log_end
+from src.models.base import TrajectoryModel, log_start, log_end
 from src.datasets import Dataset
 from src.processors import GPSNormalizer
 
@@ -316,7 +316,6 @@ def train_model(
     n_batches = np.ceil(n_examples / batch_size).astype(int)
     random_idx = np.random.permutation(x_train.shape[0])
     best_loss = 10000
-    no_improvement = 0
     for i in range(1, epochs + 1):
         for j in range(1, n_batches + 1):
             idx = random_idx[batch_size * (j - 1) : batch_size * (j)]
@@ -386,14 +385,10 @@ def train_model(
             val_dis_acc_fake=round(dis_val_f_acc, rounding),
             val_dis_loss_fake=round(dis_val_f_loss, rounding),
         )
-        # early stopping and checkpointing
-        if gen_loss < best_loss:
-            best_loss = gen_loss
-            gen.save(f"experiments/{exp_name}/{start_time}/{i:04d}")
-        else:
-            no_improvement += 1
-            if no_improvement >= patience:
-                break
+        # checkpointing
+        if gen_val_loss < best_loss:
+            best_loss = gen_val_loss
+            gen.save(f"experiments/{exp_name}/{start_time}/{i:04d}", save_traces=False)
 
 
 def run():
@@ -419,7 +414,7 @@ def run():
     # x = df.to_numpy()
 
     ## From saved npy
-    x = np.load("data/final_train.npy", allow_pickle=True)
+    x = np.load("data/final_train.npy", allow_joblib=True)
     # x = x[0 : (len(vocab_sizes) + 1)]
     # Padding zero to reach the maxlength
     x = np.concatenate(
@@ -436,7 +431,7 @@ def run():
     return gen, dis, gan
 
 
-class LSTMTrajGAN(Generative):
+class LSTMTrajGAN(TrajectoryModel):
     """An LSTM-based Trajectory Generative Adversarial Network.
 
     Based on: Rao, J., Gao, S.*, Kang, Y. and Huang, Q. (2020).
@@ -619,7 +614,7 @@ class LSTMTrajGAN(Generative):
         """Serialize the model to a directory on disk."""
         os.makedirs(save_path, exist_ok=True)
         save_path = Path(save_path)
-        pickle.dump(self.dataset, save_path / "dataset.pkl")
+        joblib.dump(self.dataset, save_path / "dataset.pkl")
         hparams = dict(
             latent_dim=self.latent_dim,
             batch_size=self.batch_size,
@@ -627,8 +622,8 @@ class LSTMTrajGAN(Generative):
             momentum=self.momentum,
         )
         if self.trained_epochs > 0:
-            pickle.dump(self.encoders, save_path / "encoders.pkl")
-            pickle.dump(self.gps_normalizer, save_path / "gps_normalizer.pkl")
+            joblib.dump(self.encoders, save_path / "encoders.pkl")
+            joblib.dump(self.gps_normalizer, save_path / "gps_normalizer.pkl")
             self.gen.save(save_path / "generator_model")
             self.dis.save(save_path / "discriminator_model")
             self.gan.save(save_path / "gan_model")
@@ -638,8 +633,8 @@ class LSTMTrajGAN(Generative):
                 timesteps=self.timesteps,
                 vocab_sizes=self.vocab_sizes,
             )
-            pickle.dump(train_state, save_path / "train_state.pkl")
-        pickle.dump(hparams, save_path / "hparams.pkl")
+            joblib.dump(train_state, save_path / "train_state.pkl")
+        joblib.dump(hparams, save_path / "hparams.pkl")
 
         return self
 
@@ -647,15 +642,15 @@ class LSTMTrajGAN(Generative):
     def restore(cls, save_path: os.PathLike):
         """Restore the model from a checkpoint on disk."""
         save_path = Path(save_path)
-        dataset = pickle.load(save_path / "dataset.pkl")
+        dataset = joblib.load(save_path / "dataset.pkl")
         model = cls(dataset)
         model.gen = load_model(save_path / "generator_model")
         model.dis = load_model(save_path / "discriminator_model")
         model.gan = load_model(save_path / "gan_model")
-        model.encoders = pickle.load(save_path / "encoders.pkl")
-        model.gps_normalizer = pickle.load(save_path / "gps_normalizer.pkl")
-        hparams = pickle.load(save_path / "hparams.pkl")
-        train_state = pickle.load(save_path / "train_state.pkl")
+        model.encoders = joblib.load(save_path / "encoders.pkl")
+        model.gps_normalizer = joblib.load(save_path / "gps_normalizer.pkl")
+        hparams = joblib.load(save_path / "hparams.pkl")
+        train_state = joblib.load(save_path / "train_state.pkl")
         for key, val in {**hparams, **train_state}:
             setattr(model, key, val)
         return model

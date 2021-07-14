@@ -38,14 +38,6 @@ class TrajectoryModel(abc.ABC):
         return type(self).__name__
 
 
-class Generative(abc.ABC):
-    """"""
-
-    @abc.abstractmethod
-    def generate(self, dataset: Dataset, n: int):
-        """Generate synthetic examples from this model."""
-
-
 def log_start(log: logging.Logger, exp_name: str, **hparams: Dict[str, Any]):
     """Write a log entry for training experiment start."""
     start_time = datetime.now()
