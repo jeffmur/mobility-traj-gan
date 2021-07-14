@@ -470,7 +470,7 @@ class LSTMTrajGAN(TrajectoryModel):
             The ratio of the data that should be assigned to the test set.
         """
         train_inds, test_inds = next(
-            GroupShuffleSplit(test_size=test_size, n_splits=2).split(
+            GroupShuffleSplit(test_size=test_size, n_splits=2, random_state=SEED).split(
                 df, groups=df[self.dataset.trajectory_column]
             )
         )
@@ -494,15 +494,18 @@ class LSTMTrajGAN(TrajectoryModel):
         df.loc[:, latlon_cols] = self.gps_normalizer.transform(df.loc[:, latlon_cols])
 
         encoded_features = []
-        for feature in self.vocab_sizes:
-            encoder = OneHotEncoder(sparse=False)
+        if train:
+            self.encoders = []
+        for i, feature in enumerate(self.vocab_sizes):
             if train:
+                encoder = OneHotEncoder(sparse=False)
                 encoder.fit(df[[feature]])
+                self.encoders.append(encoder)
+            encoder = self.encoders[i]
             feat_enc = pd.DataFrame(
                 encoder.transform(df[[feature]]),
                 columns=[f"{feature}_{i}" for i in range(0, self.vocab_sizes[feature])],
             )
-            self.encoders.append(encoder)
             encoded_features.append(feat_enc)
         df = df.reset_index().drop("index", errors="ignore", axis=1)
         df = df.drop(self.vocab_sizes.keys(), axis=1)
@@ -637,6 +640,18 @@ class LSTMTrajGAN(TrajectoryModel):
         joblib.dump(hparams, save_path / "hparams.pkl")
 
         return self
+
+    def predict(self, df: pd.DataFrame):
+        """Generate predictions based on an input dataset."""
+        x_pad, labels, tids = self.preprocess(df, train=False)
+        x_split = split_inputs(x_pad, self.vocab_sizes)
+        this_batch_size = x_pad.shape[0]
+        noise = np.random.normal(0, 1, (this_batch_size, self.latent_dim))
+        gen_inputs = x_split
+        gen_inputs.insert(-1, noise)
+        predictions = self.gen.predict(gen_inputs)
+        predictions_concat = np.concatenate(predictions, axis=2)
+        return self.postprocess(predictions_concat, labels, tids)
 
     @classmethod
     def restore(cls, save_path: os.PathLike):

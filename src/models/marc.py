@@ -22,6 +22,7 @@ from src.processors import GPSGeoHasher
 
 LOG = logging.Logger(__name__)
 LOG.setLevel(logging.DEBUG)
+SEED = 11
 
 
 def build_classifier(
@@ -110,7 +111,7 @@ class MARC(TrajectoryModel):
         """
         ids = df[[self.dataset.label_column, self.dataset.trajectory_column]].drop_duplicates()
         ids = ids.groupby("label").filter(lambda x: len(x) > 1)
-        split = StratifiedShuffleSplit(test_size=test_size, n_splits=2).split(
+        split = StratifiedShuffleSplit(test_size=test_size, n_splits=2, random_state=SEED).split(
             ids, ids[self.dataset.label_column]
         )
         train_tids, test_tids = next(split)
@@ -247,12 +248,11 @@ class MARC(TrajectoryModel):
         self.save(f"{exp_path}/saved_model")
         return history
 
-    def evaluate(self, batch_size: int = 64):
+    def evaluate(self, df: pd.DataFrame):
         """Evaluate the model performance on the test set."""
-        df = self.dataset.to_trajectories(min_points=10)
         _, test_set = self.train_test_split(df, test_size=self.test_size)
         x_test, y_test, _ = self.preprocess(test_set, train=False)
-        return self.classifier.evaluate(x=x_test, y=y_test, batch_size=batch_size)
+        return self.classifier.evaluate(x=x_test, y=y_test, batch_size=self.batch_size)
 
     def save(self, save_path: os.PathLike):
         """Serialize the model to a directory on disk."""
