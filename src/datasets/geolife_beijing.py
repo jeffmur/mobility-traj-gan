@@ -30,9 +30,9 @@ class GeoLifeBeijing(Dataset):
     """
 
     def __init__(
-        self, raw_data_path: os.PathLike, processed_file: os.PathLike = "data/geoLife_beijing.csv"
+        self, raw_data_path: os.PathLike = config.GEO_INPUT_DIR, processed_file: os.PathLike = config.GEO_INPUT_FILE
     ):
-        self.city_name = "Beijing, China" 
+        self.city_name = "Beijing, China"
         self.bounding_box = preprocess.fetch_geo_location(self.city_name)
 
         self.raw_data_path = Path(raw_data_path)
@@ -145,7 +145,7 @@ class GeoLifeBeijing(Dataset):
         df = freq_matrix.filter_bounds(df, bounds, "lat", "lon")
 
         # # time bounding??! TODO
-        
+
         # Overwrite previous cached dataset
         df.to_csv(self.processed_file, mode='a', index=False)
         return df

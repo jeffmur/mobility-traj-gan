@@ -17,7 +17,7 @@ class MDCLausanne(Dataset):
     """The Mobility Data Challenge (MDC) dataset filtered to Lausanne, CH."""
 
     def __init__(
-        self, raw_data_path: os.PathLike, processed_file: os.PathLike = "data/mdc_lausanne.csv"
+        self, raw_data_path: os.PathLike = config.MDC_INPUT_DIR, processed_file: os.PathLike = config.MDC_INPUT_FILE
     ):
         self.city_name = "Lausanne, District de Lausanne, Vaud, Switzerland"
         self.bounding_box = preprocess.fetch_geo_location(self.city_name)
