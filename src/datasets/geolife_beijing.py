@@ -13,6 +13,7 @@ City Limits = ['39.4416113', '41.0595584', '115.4172086', '117.5079852']
 import os
 from logging import Logger
 from pathlib import Path
+import glob
 
 import pandas as pd
 from src import config, freq_matrix, preprocess
@@ -22,78 +23,129 @@ LOG = Logger(__name__)
 
 
 class GeoLifeBeijing(Dataset):
-    """ GeoLife by Microsoft has been filtered with OpenStreetMaps Nominum API within 'Bejing, China' """
-    """ Data is organized as User/Trajectory/csv"""
+    """ 
+    GeoLife by Microsoft has been filtered with OpenStreetMaps Nominum API within 'Bejing, China' 
+    Data is organized as User/Trajectory/csv
+    
+    """
 
     def __init__(
         self, raw_data_path: os.PathLike, processed_file: os.PathLike = "data/geoLife_beijing.csv"
     ):
-        self.city_name = "Lausanne, District de Lausanne, Vaud, Switzerland"
+        self.city_name = "Beijing, China" 
         self.bounding_box = preprocess.fetch_geo_location(self.city_name)
 
         self.raw_data_path = Path(raw_data_path)
         self.processed_file = Path(processed_file)
-        self.raw_columns = [ #TODO SET HEADERS
-            "rid",
-            "unix",
-            "lon",
+        self.raw_columns = [ 
             "lat",
+            "lon",
+            "zero",
             "alt",
-            "speed",
-            "h_accuracy",
-            "h_dop",
-            "v_accuracy",
-            "v_dop",
-            "speed_accuracy",
-            "time_since_boot",
+            "n_days",
+            "date",
+            "time",
         ]
         self.label_column = "label"
         self.trajectory_column = "tid"
         self.datetime_column = "datetime"
         self.lat_column = "lat"
         self.lon_column = "lon"
+        self.preprocess_col = [self.label_column, 'date', 'time', self.lat_column, self.lon_column]
         self.columns = [self.label_column, self.trajectory_column, self.lat_column, self.lon_column]
 
     def preprocess(self):
-        """Preprocess the raw data into a single CSV file of trajectory data.
+        self._sanitize()
+        return self._filter()
+        
+
+    def _sanitize(self):
+        """
+        Step 1 
+        ----------
+        First stage of pre-processing GeoLife
+
+        Takes raw data {GeoLife/Data/UID/Trajectory/*.plt} -> one csv 
+        
+        Preprocess the raw data into a single CSV file of trajectory data.
 
         Long-running (takes a few minutes).
 
+        """
+        oneTimeHeader = True
+        # Get all User Directories within GeoLife/Data directory
+        for user_dir in self.raw_data_path.glob('*'):
+            frames = []
+            uid = str(user_dir)[-3:]
+            # Read in raw gps
+            LOG.info("On User: %s", uid)
+            # Iterate past /Trajectory/ directory 
+            dir = user_dir / Path("Trajectory") 
+            # Set current path to this dir
+            os.chdir(dir)
+            # Create a list of relative paths
+            all_plt_files = list(glob.glob("*.plt"))
+            # Parse through each file
+            for plt in all_plt_files: # working one plt file at a time, then append to csv
+                # Read in raw gps
+                LOG.info("\t Reading file: %s", plt)
+                # Open each .plt file 
+                with open(plt, 'r') as file: 
+                    # Skip first 6 lines of meta-data
+                    [next(file) for _ in range(6)]
+                    # concat records to list
+                    lines = [line.rstrip() for line in file]
+                    # Create DF and parse
+                    df = pd.DataFrame(lines)
+                    # Expand single column to all
+                    df = df[0].str.split(',',expand=True)
+                    # Set column names
+                    df.columns = self.raw_columns
+
+                    # Attach UID of cur user
+                    df['label'] = uid
+
+                    # # Final Format 
+                    df = df[['label', 'date', 'time' ,'lat', 'lon']]
+                    # # save as INPUT_FILE (one csv)
+                    if(oneTimeHeader) : 
+                        df.to_csv(self.processed_file, mode='a', index=False)
+                        oneTimeHeader = False
+                    else : df.to_csv(self.processed_file, mode='a', index=False, header=False)
+                    # Note: to avoid many duplicates, it has been removed from the saved csv file
+
+        LOG.info("Preprocessed data written to: %s", self.processed_file)
+
+    def _filter(self):
+        """
+        Step 2
+        ---------
+        There must be a geoLife_beijing.csv file set as the self.processesed_file, as this will be used as an input. 
+
+        Filter will condense the data by space and time dimensions & prepare it for analysis. 
+
         Parameters
         ----------
-        output_file : os.PathLike
-            The file path to save the processed CSV data.
+        :output: DataFrame 
+            [ label, datetime, lat, lon ]
         """
 
-        if os.path.exists(self.processed_file):
-            df = pd.read_csv(self.processed_file)
-            df.datetime = pd.to_datetime(df.datetime)
-            return df
-        raw_gps = self.raw_data_path / "gps.csv"
-        raw_records = self.raw_data_path / "records.csv"
-        # Read in raw gps
-        LOG.info("Reading file: %s", raw_gps)
-        df = pd.read_table(raw_gps, names=self.raw_columns)
-        # Drop extra columns
-        df = df[["rid", "unix", "lat", "lon"]]
-        # filter to bounds
+        if not os.path.exists(self.processed_file):
+            self.preprocess()
+            return -1 
+
+        # Import file 
+        df = pd.read_csv(self.processed_file, parse_dates=[['date', 'time']]) # Assuming static placement of date time
+        df = df.rename(columns={'date_time': 'datetime'}) 
+        df = df[['label', 'datetime', 'lat', 'lon']]
+
+        # # filter to bounds
         cell_size = config.CELL_SIZE_METERS * config.MILES_PER_METER  # meters * conversion to miles
         bounds, _, _ = freq_matrix.set_map(self.bounding_box, cell_size)
         df = freq_matrix.filter_bounds(df, bounds, "lat", "lon")
-        # Convert Unix to datetime
-        df.loc[:, "datetime"] = pd.to_datetime(df.unix, unit="s")
-        df = df.drop(["unix"], axis=1)
-        # Read GPS records in chunks to join and get user id label
-        rec_headers = ["rid", "label", "tz", "time", "type"]
-        LOG.info("Reading file: %s", raw_records)
-        iter_rec = pd.read_table(raw_records, names=rec_headers, iterator=True, chunksize=100000)
-        df_rec = pd.concat([chunk[chunk["type"] == "gps"] for chunk in iter_rec])
-        # Join gps to records on RID
-        df = df.set_index("rid")
-        df_rec = df_rec.set_index("rid")
-        df = df.join(df_rec, how="inner").reset_index()
-        df = df.drop_duplicates(subset=["rid"])
-        df = df[self.columns]
-        df.to_csv(self.processed_file, index=False)
-        LOG.info("Preprocessed data written to: %s", self.processed_file)
+
+        # # time bounding??! TODO
+        
+        # Overwrite previous cached dataset
+        df.to_csv(self.processed_file, mode='a', index=False)
         return df

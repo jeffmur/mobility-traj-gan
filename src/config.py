@@ -27,12 +27,18 @@ Project Directory
 
 DATASET = str(os.getenv("DATASET"))
 """
-Name of the dataset we are processing. Could be "GeoLife", "MDC", etc.
+Name of the dataset we are processing. Could be "GeoLife", "MDC", "Privamov", NYC, etc.
 """
 
-DATA_HEADERS = {"MDC": ["Index", "UID", "Date", "Time", "Latitude", "Longitude"]}.get(DATASET)
+DATA_HEADERS = {
+    "MDC": ["Index", "UID", "Date", "Time", "Latitude", "Longitude"],
+    "GeoLife": ["Latitude", "Longitude", "Zero", "Altitude", "Num of Days", "Date", "Time"],
+    "Privamov": ['ID', 'Date', 'Time', 'Longitude', 'Latitude']
+    }.get(DATASET)
 """
-Path to parsed dataset / (mdc || geoLife || privamov || etc.) /user_by_month/ included
+(mdc || geoLife || privamov || etc.) 
+RAW HEADERs
+TODO: Setup .env interface for each dataset with applicable paths & modularity
 """
 
 CELL_SIZE_METERS = 300
@@ -60,3 +66,13 @@ CITY = os.getenv("CITY")
 """
 Name of the city to retrieve the bounding box for.
 """
+
+
+
+## MY BUCKET LIST 
+
+# 1. Get a job , buy a house, other adult things
+# 2. Travel - Italy, Switzerland, Germany 
+# 3. Great something new - invention 
+# 4. Learn how to fly a plane 
+# 5. Try something new
