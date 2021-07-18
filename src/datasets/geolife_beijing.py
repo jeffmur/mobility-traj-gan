@@ -3,15 +3,11 @@
 The GeoLife dataset is filtered by the city limits of Beijing
 City Limits = ['39.4416113', '41.0595584', '115.4172086', '117.5079852']
 
-!Important Note: 
- - Before using this dataset, 
-### TODO
+# TODO: Case of multiple expirements: i.e processed.csv vs filtered.csv?
 
-        # Assume running split_by_month.py has been run??
-        # Add implementation error check ^^
 """
 import os
-from logging import Logger
+from logging import Logger, raiseExceptions
 from pathlib import Path
 import glob
 
@@ -52,16 +48,20 @@ class GeoLifeBeijing(Dataset):
         self.lat_column = "lat"
         self.lon_column = "lon"
         self.preprocess_col = [self.label_column, 'date', 'time', self.lat_column, self.lon_column]
-        self.columns = [self.label_column, self.trajectory_column, self.lat_column, self.lon_column]
+        self.columns = [self.label_column, self.trajectory_column, self.lat_column, self.lon_column]            
+
+    def fetchGeoDF(self):
+        """
+        Purpose:  Check for existing csv
+
+        Returns df['datetime', 'label', 'lat', 'lon']
+        """
+        df = pd.read_csv(self.processed_file, parse_dates=[['date', 'time']])
+        df = df.rename(columns={'date_time': 'datetime'}) 
+        return df
 
     def preprocess(self):
-        self._sanitize()
-        return self._filter()
-        
-
-    def _sanitize(self):
         """
-        Step 1 
         ----------
         First stage of pre-processing GeoLife
 
@@ -69,10 +69,18 @@ class GeoLifeBeijing(Dataset):
         
         Preprocess the raw data into a single CSV file of trajectory data.
 
+        Filters out by cell_size grid & boundry, see freq_matrix.py
+
         Long-running (takes a few minutes).
 
         """
+        if os.path.exists(self.processed_file): return self.fetchGeoDF()
+
+        # Single call for header & boundries
         oneTimeHeader = True
+        cell_size = config.CELL_SIZE_METERS * config.MILES_PER_METER  # meters * conversion to miles
+        bounds, _, _ = freq_matrix.set_map(self.bounding_box, cell_size)
+
         # Get all User Directories within GeoLife/Data directory
         for user_dir in self.raw_data_path.glob('*'):
             frames = []
@@ -91,61 +99,27 @@ class GeoLifeBeijing(Dataset):
                 LOG.info("\t Reading file: %s", plt)
                 # Open each .plt file 
                 with open(plt, 'r') as file: 
-                    # Skip first 6 lines of meta-data
-                    [next(file) for _ in range(6)]
-                    # concat records to list
-                    lines = [line.rstrip() for line in file]
-                    # Create DF and parse
-                    df = pd.DataFrame(lines)
-                    # Expand single column to all
-                    df = df[0].str.split(',',expand=True)
-                    # Set column names
-                    df.columns = self.raw_columns
+                    
+                    plt_f = pd.read_csv(plt, skiprows=6, names=self.raw_columns)
 
                     # Attach UID of cur user
-                    df['label'] = uid
+                    plt_f['label'] = uid
 
-                    # # Final Format 
-                    df = df[['label', 'date', 'time' ,'lat', 'lon']]
-                    # # save as INPUT_FILE (one csv)
+                    # # Correcting Format 
+                    plt_f = plt_f[['label', 'date', 'time' ,'lat', 'lon']]
+
+                    # Filter data before writing to file
+                    plt_f = freq_matrix.filter_bounds(plt_f, bounds, "lat", "lon")
+
+                    # Only save header once, because appending data to INPUT_FILE
                     if(oneTimeHeader) : 
-                        df.to_csv(self.processed_file, mode='a', index=False)
+                        plt_f.to_csv(self.processed_file, mode='a', index=False)
                         oneTimeHeader = False
-                    else : df.to_csv(self.processed_file, mode='a', index=False, header=False)
-                    # Note: to avoid many duplicates, it has been removed from the saved csv file
+                    
+                    else : 
+                        plt_f.to_csv(self.processed_file, mode='a', index=False, header=False)
 
         LOG.info("Preprocessed data written to: %s", self.processed_file)
-
-    def _filter(self):
-        """
-        Step 2
-        ---------
-        There must be a geoLife_beijing.csv file set as the self.processesed_file, as this will be used as an input. 
-
-        Filter will condense the data by space and time dimensions & prepare it for analysis. 
-
-        Parameters
-        ----------
-        :output: DataFrame 
-            [ label, datetime, lat, lon ]
-        """
-
-        if not os.path.exists(self.processed_file):
-            self.preprocess()
-            return -1 
-
-        # Import file 
-        df = pd.read_csv(self.processed_file, parse_dates=[['date', 'time']]) # Assuming static placement of date time
-        df = df.rename(columns={'date_time': 'datetime'}) 
-        df = df[['label', 'datetime', 'lat', 'lon']]
-
-        # # filter to bounds
-        cell_size = config.CELL_SIZE_METERS * config.MILES_PER_METER  # meters * conversion to miles
-        bounds, _, _ = freq_matrix.set_map(self.bounding_box, cell_size)
-        df = freq_matrix.filter_bounds(df, bounds, "lat", "lon")
-
-        # # time bounding??! TODO
-
-        # Overwrite previous cached dataset
-        df.to_csv(self.processed_file, mode='a', index=False)
-        return df
+        
+        # Fetch & Verify Dataframe
+        return self.fetchGeoDF()

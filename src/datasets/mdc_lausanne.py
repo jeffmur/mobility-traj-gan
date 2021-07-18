@@ -59,6 +59,7 @@ class MDCLausanne(Dataset):
             df = pd.read_csv(self.processed_file)
             df.datetime = pd.to_datetime(df.datetime)
             return df
+            
         raw_gps = self.raw_data_path / "gps.csv"
         raw_records = self.raw_data_path / "records.csv"
         # Read in raw gps
