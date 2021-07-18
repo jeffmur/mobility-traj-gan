@@ -3,6 +3,7 @@
 A base class for mobility datasets.
 """
 import abc
+import os, pandas as pd
 
 
 class Dataset(abc.ABC):
