@@ -391,46 +391,6 @@ def train_model(
             gen.save(f"experiments/{exp_name}/{start_time}/{i:04d}", save_traces=False)
 
 
-def run():
-    """Run an experiment with a given set of hyperparameters."""
-    exp_name = "trajgan_000"
-    os.makedirs(f"experiments/{exp_name}", exist_ok=True)
-    optimizer = optimizers.Adam(0.001, 0.5)
-    timesteps = 144
-    epochs = 200
-    vocab_sizes = {"day": 7, "hour": 24, "category": 10}
-    gen, dis, gan = build_gan(optimizer, timesteps, vocab_sizes)
-    # from CSV
-    # import pandas as pd
-    # df = pd.read_csv("data/dev_train_encoded_final.csv")
-    # cat_frames = []
-    # for key, val in vocab_sizes.items():
-    #     cat = pd.DataFrame(
-    #         utils.to_categorical(df[key], num_classes=val),
-    #         columns=[f"{key}_{i}" for i in range(0, val)],
-    #     )
-    #     cat_frames.append(cat)
-    # df = pd.concat([df.drop(["tid", "label", *vocab_sizes.keys()], axis=1), *cat_frames], axis=1)
-    # x = df.to_numpy()
-
-    ## From saved npy
-    x = np.load("data/final_train.npy", allow_joblib=True)
-    # x = x[0 : (len(vocab_sizes) + 1)]
-    # Padding zero to reach the maxlength
-    x = np.concatenate(
-        [pad_sequences(f, timesteps, padding="pre", dtype="float32") for f in x], axis=2
-    )
-
-    n = x.shape[0]
-    idx = np.random.permutation(n)
-    valid_split = 0.1
-    valid_n = np.ceil(n * valid_split).astype(int)
-    valid_idx, train_idx = idx[:valid_n], idx[valid_n:]
-    x_train, x_valid = x[train_idx, :], x[valid_idx, :]
-    train_model(exp_name, gen, dis, gan, x_train, x_valid, vocab_sizes, epochs=epochs)
-    return gen, dis, gan
-
-
 class LSTMTrajGAN(TrajectoryModel):
     """An LSTM-based Trajectory Generative Adversarial Network.
 
@@ -545,9 +505,11 @@ class LSTMTrajGAN(TrajectoryModel):
         )
         x_res = np.reshape(x, (x.shape[0] * x.shape[1], x.shape[2]))
         df = pd.DataFrame(x_res)
+        # Reverse the padding by reapplying the mask
+        mask = df.iloc[:, -1]
         df[self.dataset.label_column] = labels
         df[self.dataset.trajectory_column] = tids
-        df = df[df[0] + df[1] != 0.0].reset_index()
+        df = df[mask > 0.0].reset_index()
         latlon_cols = [self.dataset.lat_column, self.dataset.lon_column]
         df.loc[:, latlon_cols] = self.gps_normalizer.inverse_transform(df[[0, 1]])
 

@@ -1,3 +1,7 @@
+"""mobility_cli.py
+
+A Command-Line Interface for interacting with the mobility models and datasets.
+"""
 import logging
 import random
 import sys
@@ -8,8 +12,7 @@ import pandas as pd
 from tensorflow.random import set_seed
 
 sys.path.append(".")
-from src import models
-from src import datasets
+from src import datasets, models
 
 LOG = logging.getLogger("mobility")
 LOG.setLevel(logging.DEBUG)
