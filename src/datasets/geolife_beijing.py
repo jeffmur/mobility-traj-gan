@@ -3,8 +3,6 @@
 The GeoLife dataset is filtered by the city limits of Beijing
 City Limits = ['39.4416113', '41.0595584', '115.4172086', '117.5079852']
 
-# TODO: Case of multiple expirements: i.e processed.csv vs filtered.csv?
-
 """
 import os
 from logging import Logger, raiseExceptions
