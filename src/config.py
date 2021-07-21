@@ -4,35 +4,54 @@ import dotenv
 
 dotenv.load_dotenv()
 
-DATA_INPUT_DIR = str(os.getenv("DATA_INPUT_DIR"))
+"""
+Dataset Specific Path Locations
+"""
+
+GEO_INPUT_DIR = str(os.getenv("GEO_INPUT_DIR"))
 """
 Note: Used with os.walk which assumes it is a directory (hence no trailing backslash)
 Important: This is the RAW dataset (not santized or preprocessed)
+ex: data/GeoLife/Data/
 """
 
-DATA_INPUT_FILE = str(os.getenv("DATA_INPUT_FILE"))
+GEO_INPUT_FILE = str(os.getenv("GEO_INPUT_FILE"))
 """
 Input data filename, if a single CSV file (not a dir)
+ex: data/geoLife_beijing.csv
 """
 
-DATA_OUTPUT_DIR = str(os.getenv("DATA_OUTPUT_DIR"))
+MDC_INPUT_DIR = str(os.getenv("MDC_INPUT_DIR"))
+
+MDC_INPUT_FILE = str(os.getenv("MDC_INPUT_FILE"))
+
 """
-Used for exporting data (as images or csvs)
+TODO: Implement Privamov
 """
 
-GIT_PATH = str(os.getenv("GIT_PATH"))
+PRV_INPUT_DIR = str(os.getenv("PRV_INPUT_FILE"))
+
+PRV_INPUT_FILE = str(os.getenv("PRV_INPUT_FILE"))
+
+
 """
-Project Directory
+Shared Variables
 """
 
 DATASET = str(os.getenv("DATASET"))
 """
-Name of the dataset we are processing. Could be "GeoLife", "MDC", etc.
+Name of the dataset we are processing. Could be "GeoLife", "MDC", "Privamov", NYC, etc.
 """
 
-DATA_HEADERS = {"MDC": ["Index", "UID", "Date", "Time", "Latitude", "Longitude"]}.get(DATASET)
+DATA_HEADERS = {
+    "MDC": ["Index", "UID", "Date", "Time", "Latitude", "Longitude"],
+    "GEO": ["Latitude", "Longitude", "Zero", "Altitude", "Num of Days", "Date", "Time"],
+    "PRV": ['ID', 'Date', 'Time', 'Longitude', 'Latitude']
+    }.get(DATASET)
 """
-Path to parsed dataset / (mdc || geoLife || privamov || etc.) /user_by_month/ included
+(mdc || geoLife || privamov || etc.) 
+RAW HEADERs
+TODO: Setup .env interface for each dataset with applicable paths & modularity
 """
 
 CELL_SIZE_METERS = 300
@@ -45,18 +64,7 @@ MILES_PER_METER = 0.00062137119
 Distance unit conversion constant
 """
 
-FM_MATRIX = os.getenv("FM_MATRIX")
-"""
-Post processing pah in .env for output of FM_all_users.py
-( .csv file with all users and locations inside of Frequency Matrix )
-"""
-
 GPS_BB = os.getenv("GPS_BB")
 """
 Path to the file with raw GPS coordinates but filtered to bounding box region
-"""
-
-CITY = os.getenv("CITY")
-"""
-Name of the city to retrieve the bounding box for.
 """
