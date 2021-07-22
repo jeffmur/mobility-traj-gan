@@ -554,7 +554,7 @@ class LSTMTrajGAN(TrajectoryModel):
         x_train, x_valid = x[train_idx, :], x[valid_idx, :]
         # build the network
         self.gen, self.dis, self.gan = build_gan(optimizer, self.timesteps, self.vocab_sizes)
-        exp_name = f"{type(self).__name__}"
+        exp_name = f"{type(self).__name__}_{type(self.dataset).__name__}"
         hparams = dict(epochs=epochs, batch_size=batch_size, latent_dim=latent_dim)
         start_time = log_start(LOG, exp_name, **hparams)
         start_time_str = start_time.strftime("%Y-%m-%dT%H:%M:%S")
