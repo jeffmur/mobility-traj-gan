@@ -17,7 +17,9 @@ class MDCLausanne(Dataset):
     """The Mobility Data Challenge (MDC) dataset filtered to Lausanne, CH."""
 
     def __init__(
-        self, raw_data_path: os.PathLike = config.MDC_INPUT_DIR, processed_file: os.PathLike = config.MDC_INPUT_FILE
+        self,
+        raw_data_path: os.PathLike = config.MDC_INPUT_DIR,
+        processed_file: os.PathLike = config.MDC_INPUT_FILE,
     ):
         self.city_name = "Lausanne, District de Lausanne, Vaud, Switzerland"
         self.bounding_box = preprocess.fetch_geo_location(self.city_name)
@@ -48,18 +50,13 @@ class MDCLausanne(Dataset):
         """Preprocess the raw data into a single CSV file of trajectory data.
 
         Long-running (takes a few minutes).
-
-        Parameters
-        ----------
-        output_file : os.PathLike
-            The file path to save the processed CSV data.
         """
 
         if os.path.exists(self.processed_file):
             df = pd.read_csv(self.processed_file)
             df.datetime = pd.to_datetime(df.datetime)
             return df
-            
+
         raw_gps = self.raw_data_path / "gps.csv"
         raw_records = self.raw_data_path / "records.csv"
         # Read in raw gps
