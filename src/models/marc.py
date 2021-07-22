@@ -204,7 +204,7 @@ class MARC(TrajectoryModel):
         self.momentum = momentum
         self.test_size = test_size
         self.patience = patience
-        exp_name = f"{type(self).__name__}"
+        exp_name = f"{type(self).__name__}_{type(self.dataset).__name__}"
         start_time = log_start(LOG, exp_name, batch_size=batch_size)
         start_time_str = start_time.strftime("%Y-%m-%dT%H:%M:%S")
         exp_path = Path(f"experiments/{exp_name}/{start_time_str}")
