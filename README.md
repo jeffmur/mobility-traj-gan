@@ -26,7 +26,7 @@ environment with privacy preservation.
 - [x] Port MARC reidentifier model to TF2
 - [ ] Train MARC on MDC dataset
 - [ ] Compare MARC performance on real vs. generated MDC trajectories for LSTM-TrajGAN
-- [ ] Preprocessing code for GeoLife data so it can be fed into LSTM-TrajGAN
+- [x] Preprocessing code for GeoLife data so it can be fed into LSTM-TrajGAN
 - [ ] LSTM-TrajGAN training on GeoLife dataset
 - [ ] Preprocessing code for Privamov data so it can be fed into LSTM-TrajGAN
 - [ ] LSTM-TrajGAN training on Privamov dataset
