@@ -20,7 +20,7 @@ class Dataset(abc.ABC):
         """Preprocess the raw data."""
         raise NotImplementedError()
 
-    def to_trajectories(self, min_points: int = 2):
+    def to_trajectories(self, min_points: int = 2, *args):
         """Return the dataset as a Pandas DataFrame split into user-week trajectories.
 
         Multiple points within a ten minute interval will be removed.
@@ -30,6 +30,8 @@ class Dataset(abc.ABC):
         min_points : int
             The minimum number of location points (rows) in a
             trajectory to include it in the dataset.
+        args : str
+            The names of any extra categorical columns to pass through.
         """
 
         df = self.preprocess()
@@ -44,7 +46,17 @@ class Dataset(abc.ABC):
         df["tenminute"] = (df[self.datetime_column].dt.minute // 10 * 10).astype(int)
         df = (
             df.groupby(
-                [self.label_column, "year", "month", "week", "day", "weekday", "hour", "tenminute"]
+                [
+                    self.label_column,
+                    "year",
+                    "month",
+                    "week",
+                    "day",
+                    "weekday",
+                    "hour",
+                    "tenminute",
+                    *args,
+                ]
             )
             .agg({self.lat_column: "mean", self.lon_column: "mean"})
             .reset_index()
@@ -64,6 +76,7 @@ class Dataset(abc.ABC):
                 self.lon_column,
                 "weekday",
                 "hour",
+                *args,
             ]
         ]
 

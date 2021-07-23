@@ -30,26 +30,22 @@ TODO: Implement Privamov
 """
 
 PRV_INPUT_DIR = str(os.getenv("PRV_INPUT_FILE"))
-
 PRV_INPUT_FILE = str(os.getenv("PRV_INPUT_FILE"))
 
-
+FSN_INPUT_DIR = str(os.getenv("FSN_INPUT_DIR"))
+FSN_INPUT_FILE = str(os.getenv("FSN_INPUT_FILE"))
 """
-Shared Variables
-"""
-
-DATASET = str(os.getenv("DATASET"))
-"""
-Name of the dataset we are processing. Could be "GeoLife", "MDC", "Privamov", NYC, etc.
+Foursquare NYC
 """
 
 DATA_HEADERS = {
     "MDC": ["Index", "UID", "Date", "Time", "Latitude", "Longitude"],
     "GEO": ["Latitude", "Longitude", "Zero", "Altitude", "Num of Days", "Date", "Time"],
-    "PRV": ['ID', 'Date', 'Time', 'Longitude', 'Latitude']
-    }.get(DATASET)
+    "PRV": ["ID", "Date", "Time", "Longitude", "Latitude"],
+    "FSN": ["user_id", "venue_id", "category_id", "category", "lat", "lon", "tz", "utc_time"],
+}
 """
-(mdc || geoLife || privamov || etc.) 
+(mdc || geoLife || privamov || etc.)
 RAW HEADERs
 TODO: Setup .env interface for each dataset with applicable paths & modularity
 """
