@@ -1,3 +1,7 @@
+"""mobility_cli.py
+
+A Command-Line Interface for interacting with the mobility models and datasets.
+"""
 import logging
 import random
 import sys
@@ -8,8 +12,7 @@ import pandas as pd
 from tensorflow.random import set_seed
 
 sys.path.append(".")
-from src import models
-from src import datasets
+from src import datasets, models
 
 LOG = logging.getLogger("mobility")
 LOG.setLevel(logging.DEBUG)
@@ -31,18 +34,17 @@ def set_seeds(seed):
 
 
 @click.command()
-@click.argument("saved_model", type=click.Path(exists=True, file_okay=False))
+@click.argument("model", type=click.Choice(MODEL_CHOICES.keys()))
+@click.argument("saved_path", type=click.Path(exists=True, file_okay=False))
 @click.argument("dataset", type=click.Choice(DATASET_CHOICES))
+@click.argument("dataset_path", type=click.Path(exists=True))
 @click.argument("output_path", type=click.Path(dir_okay=False))
-@click.option(
-    "--n",
-    type=click.INT,
-    default=-1,
-    help="The number of synthetic examples to generate. Default is the size of original dataset.",
-)
-def generate(saved_model, dataset, output_path, n):
-    """Use SAVED_MODEL to generate NUM trajectories based on DATASET and write to OUTPUT_PATH as CSV."""
-    # TODO
+def generate(model, saved_path, dataset, dataset_path, output_path):
+    """Use trained MODEL saved in SAVED_PATH to generate NUM trajectories based on DATASET
+    and write to OUTPUT_PATH as CSV."""
+    the_dataset = DATASET_CHOICES.get(dataset)(dataset_path)
+    the_model = MODEL_CHOICES.get(model).restore(saved_path)
+    the_model.predict(the_dataset).to_csv(output_path, index=False)
 
 
 @click.command()
