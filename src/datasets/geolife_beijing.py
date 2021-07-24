@@ -112,7 +112,7 @@ class GeoLifeBeijing(Dataset):
                     one_time_header = False
 
                 else:
-                    plt_f.to_csv(self.proce ssed_file, mode="a", index=False, header=False)
+                    plt_f.to_csv(self.processed_file, mode="a", index=False, header=False)
 
         LOG.info("Preprocessed data written to: %s", self.processed_file)
 
