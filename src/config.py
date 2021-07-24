@@ -22,15 +22,16 @@ ex: data/geoLife_beijing.csv
 """
 
 MDC_INPUT_DIR = str(os.getenv("MDC_INPUT_DIR"))
-
 MDC_INPUT_FILE = str(os.getenv("MDC_INPUT_FILE"))
-
 """
-TODO: Implement Privamov
+MDC Lausanne
 """
 
-PRV_INPUT_DIR = str(os.getenv("PRV_INPUT_FILE"))
+PRV_INPUT_DIR = str(os.getenv("PRV_INPUT_DIR"))
 PRV_INPUT_FILE = str(os.getenv("PRV_INPUT_FILE"))
+"""
+Privamov Lyon
+"""
 
 FSN_INPUT_DIR = str(os.getenv("FSN_INPUT_DIR"))
 FSN_INPUT_FILE = str(os.getenv("FSN_INPUT_FILE"))
