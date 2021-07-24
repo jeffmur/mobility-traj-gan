@@ -18,7 +18,7 @@ LOG = Logger(__name__)
 
 class PrivamovLyon(Dataset):
     """
-    PRIVA'MOV has been filtered to the greater area of Lyon, France. 
+    PRIVA'MOV has been filtered to the greater area of Lyon, France.
 
     Sonia Ben Mokhtar, Antoine Boutet, Louafi Bouzouina, Patrick Bonnel, Olivier Brette, et al..
         PRIVA’MOV: Analysing Human Mobility Through Multi-Sensor Datasets. NetMob 2017, Apr 2017,
@@ -55,20 +55,22 @@ class PrivamovLyon(Dataset):
         """
         ## If it exits, return df
         if os.path.exists(self.processed_file):
-            df = pd.read_csv(self.processed_file, parse_dates=[["datetime"]])
+            df = pd.read_csv(self.processed_file, parse_dates=["datetime"])
             return df
-
-        # Must be using raw-gps (not a csv)
-        raw_gps = self.raw_data_path / "raw-gps"
-
-        LOG.info("Reading file: %s", raw_gps)
-        df = pd.read_table(raw_gps, names=self.raw_columns)
-        df.datetime = pd.to_datetime(df.datetime)
-
-        ## Spatial bound 
+        ## Spatial bound
         cell_size = config.CELL_SIZE_METERS * config.MILES_PER_METER  # meters * conversion to miles
         bounds, _, _ = freq_matrix.set_map(self.bounding_box, cell_size)
-        df = freq_matrix.filter_bounds(df, bounds, "lat", "lon")
+        # Must be using raw-gps (not a csv)
+        raw_gps = self.raw_data_path / "privamov-gps"
+
+        LOG.info("Reading file: %s", raw_gps)
+        # Read a chunk of 100k rows at a time and filter by GPS bounding box
+        iter_df = pd.read_table(raw_gps, names=self.raw_columns, iterator=True, chunksize=100000)
+        chunks = []
+        for chunk in iter_df:
+            chunks.append(freq_matrix.filter_bounds(chunk, bounds, "lat", "lon"))
+        df = pd.concat(chunks)
+        df.datetime = pd.to_datetime(df.datetime)
 
         ## Final format & Save
         df = df[self.columns]
