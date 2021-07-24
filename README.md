@@ -1,4 +1,4 @@
-# mobility-lstm
+# Traj-GAN applied to CDR
 
 ## Purpose
 
@@ -17,6 +17,7 @@ environment with privacy preservation.
 | 4/5  | Optimize freqMatrix function            | alexkyllo |
 | 4/6  | Appended Ali's LSTM-AE, updated req.txt | jeffmur   |
 | 7/17 | Added LSTMTrajGAN and MARC models       | alexkyllo |
+| 7/24 | GeoLife and Privamov Ready for training | jeffmur   |
 
 ## TODOs
 
@@ -29,7 +30,7 @@ environment with privacy preservation.
 - [ ] Compare MARC performance on real vs. generated MDC trajectories for LSTM-TrajGAN
 - [x] Preprocessing code for GeoLife data so it can be fed into LSTM-TrajGAN
 - [ ] LSTM-TrajGAN training on GeoLife dataset
-- [ ] Preprocessing code for Privamov data so it can be fed into LSTM-TrajGAN
+- [x] Preprocessing code for Privamov data so it can be fed into LSTM-TrajGAN
 - [ ] LSTM-TrajGAN training on Privamov dataset
 - [x] Post-processing code to output LSTM-TrajGAN generated trajectories to CSV
 - [ ] Get outputs from Yuting's LSTM-AE model on MDC, FourSquare, Privamov and GeoLife datasets
