@@ -8,6 +8,8 @@ import logging
 import os
 from typing import Dict, Any
 
+import pandas as pd
+
 from src.datasets import Dataset
 
 
@@ -24,6 +26,11 @@ class TrajectoryModel(abc.ABC):
     @abc.abstractmethod
     def train(self, optimizer, epochs: int, batch_size: int, **kwargs):
         """Train the model."""
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def predict(self, df: pd.DataFrame):
+        """Use the model to predict (or generate) given new input data."""
         raise NotImplementedError
 
     @abc.abstractmethod

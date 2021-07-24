@@ -5,6 +5,8 @@ channels:
   - defaults
 dependencies:
   - pylint
+  - cudatoolkit
+  - cudnn
   - tensorflow-gpu
   - geopy
   - joblib

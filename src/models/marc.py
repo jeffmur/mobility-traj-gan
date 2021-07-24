@@ -3,11 +3,11 @@
 TensorFlow 2 reimplementation of the Multi-Aspect Trajectory Classifier model
 from: https://github.com/bigdata-ufsc/petry-2020-marc
 """
-import joblib
 import logging
 import os
 from pathlib import Path
 
+import joblib
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import StratifiedShuffleSplit
@@ -16,13 +16,12 @@ from tensorflow.keras import Model, callbacks, initializers, layers, optimizers,
 from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 
+from src import config
 from src.datasets import Dataset
 from src.models.base import TrajectoryModel, log_end, log_start
 from src.processors import GPSGeoHasher
 
 LOG = logging.Logger(__name__)
-LOG.setLevel(logging.DEBUG)
-SEED = 11
 
 
 def build_classifier(
@@ -111,9 +110,9 @@ class MARC(TrajectoryModel):
         """
         ids = df[[self.dataset.label_column, self.dataset.trajectory_column]].drop_duplicates()
         ids = ids.groupby("label").filter(lambda x: len(x) > 1)
-        split = StratifiedShuffleSplit(test_size=test_size, n_splits=2, random_state=SEED).split(
-            ids, ids[self.dataset.label_column]
-        )
+        split = StratifiedShuffleSplit(
+            test_size=test_size, n_splits=2, random_state=config.SEED
+        ).split(ids, ids[self.dataset.label_column])
         train_tids, test_tids = next(split)
         train_set = df[df[self.dataset.trajectory_column].isin(train_tids)]
         test_set = df[df[self.dataset.trajectory_column].isin(test_tids)]
@@ -248,11 +247,15 @@ class MARC(TrajectoryModel):
         self.save(f"{exp_path}/saved_model")
         return history
 
+    def predict(self, df: pd.DataFrame):
+        """Predict the labels of a dataset."""
+        x, _, _ = self.preprocess(df, train=False)
+        return self.classifier.predict(x, batch_size=self.batch_size)
+
     def evaluate(self, df: pd.DataFrame):
         """Evaluate the model performance on the test set."""
-        _, test_set = self.train_test_split(df, test_size=self.test_size)
-        x_test, y_test, _ = self.preprocess(test_set, train=False)
-        return self.classifier.evaluate(x=x_test, y=y_test, batch_size=self.batch_size)
+        x, y, _ = self.preprocess(df, train=False)
+        return self.classifier.evaluate(x, y, batch_size=self.batch_size)
 
     def save(self, save_path: os.PathLike):
         """Serialize the model to a directory on disk."""

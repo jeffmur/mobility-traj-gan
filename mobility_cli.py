@@ -11,10 +11,10 @@ import numpy as np
 import pandas as pd
 from tensorflow.random import set_seed
 
-sys.path.append(".")
-from src import datasets, models
+# sys.path.append(".")
+from src import datasets, models, config
 
-LOG = logging.getLogger("mobility")
+LOG = logging.getLogger("src")
 LOG.setLevel(logging.DEBUG)
 fh = logging.FileHandler("mobility.log")
 fh.setLevel(logging.DEBUG)
@@ -80,6 +80,5 @@ def main():
 
 
 if __name__ == "__main__":
-    SEED = 11
-    set_seeds(SEED)
+    set_seeds(config.SEED)
     main()

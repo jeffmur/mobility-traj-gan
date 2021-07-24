@@ -1,6 +1,7 @@
 ## Temporary Path Storage for simple plug-in-play development
 import os
 import dotenv
+import numpy as np
 
 dotenv.load_dotenv()
 
@@ -64,4 +65,9 @@ Distance unit conversion constant
 GPS_BB = os.getenv("GPS_BB")
 """
 Path to the file with raw GPS coordinates but filtered to bounding box region
+"""
+
+SEED = 11
+"""
+Random number generator seed
 """

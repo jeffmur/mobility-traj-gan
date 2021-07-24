@@ -5,11 +5,11 @@ Rewrite of LSTM-TrajGAN for TF2
 import csv
 import logging
 import os
-import joblib
 from datetime import datetime
 from pathlib import Path
 from typing import Dict
 
+import joblib
 import numpy as np
 import pandas as pd
 import tensorflow as tf
@@ -21,13 +21,12 @@ from tensorflow.keras import initializers, layers, optimizers, regularizers
 from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 
-from src.models.base import TrajectoryModel, log_start, log_end
+from src import config
 from src.datasets import Dataset
+from src.models.base import TrajectoryModel, log_end, log_start
 from src.processors import GPSNormalizer
 
-SEED = 11
 LOG = logging.Logger(__name__)
-LOG.setLevel(logging.DEBUG)
 
 # Masked Loss from LSTM-TrajGAN
 def traj_loss(real_traj, gen_traj, mask, latlon_weight=10.0):
@@ -76,7 +75,7 @@ def build_inputs_latlon(timesteps: int, dense_units: int):
         units=dense_units,
         activation="relu",
         use_bias=True,
-        kernel_initializer=initializers.he_uniform(seed=SEED),
+        kernel_initializer=initializers.he_uniform(seed=config.SEED),
         name="embed_latlon",
     )
     dense_latlon = [d(x) for x in unstacked]
@@ -92,7 +91,7 @@ def build_inputs_cat(timesteps, levels, feature_name):
         units=levels,
         activation="relu",
         use_bias=True,
-        kernel_initializer=initializers.he_uniform(seed=SEED),
+        kernel_initializer=initializers.he_uniform(seed=config.SEED),
         name="emb_" + feature_name,
     )
     dense_attr = [d(x) for x in unstacked]
@@ -430,7 +429,7 @@ class LSTMTrajGAN(TrajectoryModel):
             The ratio of the data that should be assigned to the test set.
         """
         train_inds, test_inds = next(
-            GroupShuffleSplit(test_size=test_size, n_splits=2, random_state=SEED).split(
+            GroupShuffleSplit(test_size=test_size, n_splits=2, random_state=config.SEED).split(
                 df, groups=df[self.dataset.trajectory_column]
             )
         )

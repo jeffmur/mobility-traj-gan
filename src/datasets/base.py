@@ -3,7 +3,7 @@
 A base class for mobility datasets.
 """
 import abc
-import os, pandas as pd
+import pandas as pd
 
 
 class Dataset(abc.ABC):
@@ -16,11 +16,11 @@ class Dataset(abc.ABC):
     lon_column: str = "lon"
 
     @abc.abstractmethod
-    def preprocess(self):
+    def preprocess(self) -> pd.DataFrame:
         """Preprocess the raw data."""
         raise NotImplementedError()
 
-    def to_trajectories(self, min_points: int = 2, *args):
+    def to_trajectories(self, *args, min_points: int = 2) -> pd.DataFrame:
         """Return the dataset as a Pandas DataFrame split into user-week trajectories.
 
         Multiple points within a ten minute interval will be removed.
