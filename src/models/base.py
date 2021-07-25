@@ -3,13 +3,12 @@
 Base classes for models.
 """
 import abc
-from datetime import datetime
 import logging
 import os
-from typing import Dict, Any
+from datetime import datetime
+from typing import Any, Dict, Tuple
 
 import pandas as pd
-
 from src.datasets import Dataset
 
 
@@ -22,6 +21,13 @@ class TrajectoryModel(abc.ABC):
         self.start_time = None
         self.end_time = None
         self.duration = None
+
+    @abc.abstractmethod
+    def train_test_split(
+        self, df: pd.DataFrame, test_size: float = 0.2
+    ) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        """Split the dataset into a train and test set."""
+        raise NotImplementedError
 
     @abc.abstractmethod
     def train(self, optimizer, epochs: int, batch_size: int, **kwargs):

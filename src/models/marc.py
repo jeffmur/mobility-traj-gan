@@ -3,7 +3,7 @@
 TensorFlow 2 reimplementation of the Multi-Aspect Trajectory Classifier model
 from: https://github.com/bigdata-ufsc/petry-2020-marc
 """
-import logging
+from logging import getLogger
 import os
 from pathlib import Path
 
@@ -21,7 +21,7 @@ from src.datasets import Dataset
 from src.models.base import TrajectoryModel, log_end, log_start
 from src.processors import GPSGeoHasher
 
-LOG = logging.Logger(__name__)
+LOG = getLogger(__name__)
 
 
 def build_classifier(

@@ -3,7 +3,7 @@ GAN model
 Rewrite of LSTM-TrajGAN for TF2
 """
 import csv
-import logging
+from logging import getLogger
 import os
 from datetime import datetime
 from pathlib import Path
@@ -26,7 +26,7 @@ from src.datasets import Dataset
 from src.models.base import TrajectoryModel, log_end, log_start
 from src.processors import GPSNormalizer
 
-LOG = logging.Logger(__name__)
+LOG = getLogger(__name__)
 
 # Masked Loss from LSTM-TrajGAN
 def traj_loss(real_traj, gen_traj, mask, latlon_weight=10.0):

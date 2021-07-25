@@ -5,9 +5,7 @@ channels:
   - defaults
 dependencies:
   - pylint
-  - cudatoolkit
-  - cudnn
-  - tensorflow-gpu
+  - tensorflow-gpu=2.4
   - geopy
   - joblib
   - plotly

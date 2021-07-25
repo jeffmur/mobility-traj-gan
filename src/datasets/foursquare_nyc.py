@@ -1,5 +1,5 @@
 import os
-from logging import Logger
+from logging import getLogger
 from pathlib import Path
 
 import pandas as pd
@@ -8,7 +8,7 @@ from sklearn.preprocessing import OrdinalEncoder
 from src.datasets import Dataset
 from src import config
 
-LOG = Logger(__name__)
+LOG = getLogger(__name__)
 
 
 class FourSquareNYC(Dataset):
@@ -68,4 +68,4 @@ class FourSquareNYC(Dataset):
         args : str
             The names of any extra categorical columns to pass through.
         """
-        return super().to_trajectories("category", *args, min_points=min_points)
+        return super().to_trajectories(*args, min_points=min_points)

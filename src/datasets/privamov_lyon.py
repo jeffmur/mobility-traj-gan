@@ -6,14 +6,14 @@ Number of Users: 116
 
 """
 import os
-from logging import Logger
+from logging import getLogger
 from pathlib import Path
 
 import pandas as pd
 from src import config, freq_matrix, preprocess
 from src.datasets import Dataset
 
-LOG = Logger(__name__)
+LOG = getLogger(__name__)
 
 
 class PrivamovLyon(Dataset):
