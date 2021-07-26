@@ -145,7 +145,7 @@ Options:
 - [x] Train LSTM-TrajGAN on Foursquare NYC dataset
 - [x] Train LSTM-TrajGAN on GeoLife Beijing dataset
 - [x] Train LSTM-TrajGAN on Privamov Lyon dataset
-- [ ] Train MARC on MDC dataset
+- [x] Train MARC on MDC dataset
 - [ ] Train MARC on FourSquare NYC dataset
 - [ ] Train MARC on GeoLife dataset
 - [ ] Train MARC on Privamov dataset

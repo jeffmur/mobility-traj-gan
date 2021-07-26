@@ -401,8 +401,7 @@ class LSTMTrajGAN(TrajectoryModel):
     """
 
     def __init__(self, dataset: Dataset):
-        self.dataset = dataset
-        self.vocab_sizes = dataset.get_vocab_sizes()
+        super().__init__(dataset)
         self.gps_normalizer = GPSNormalizer()
         self.encoders = []
         self.timesteps = None
@@ -410,33 +409,11 @@ class LSTMTrajGAN(TrajectoryModel):
         self.momentum = None
         self.latent_dim = None
         self.batch_size = None
-        self.test_size = None
         self.patience = None
         self.gen = None
         self.dis = None
         self.gan = None
         self.trained_epochs = 0
-
-    def train_test_split(self, df: pd.DataFrame, test_size: float = 0.2):
-        """Split the dataset into train and test sets.
-
-        Use a group shuffle split to assign each trajectory to either
-        the train set or the test set.
-
-        Parameters
-        ----------
-        test_size : float
-            The ratio of the data that should be assigned to the test set.
-        """
-        train_inds, test_inds = next(
-            GroupShuffleSplit(test_size=test_size, n_splits=2, random_state=config.SEED).split(
-                df, groups=df[self.dataset.trajectory_column]
-            )
-        )
-
-        train_set = df.iloc[train_inds]
-        test_set = df.iloc[test_inds]
-        return train_set, test_set
 
     def preprocess(
         self,
@@ -530,7 +507,6 @@ class LSTMTrajGAN(TrajectoryModel):
         latent_dim: int = 100,
         learning_rate: float = 0.001,
         momentum: float = 0.5,
-        test_size: float = 0.2,
         patience: int = 10,
     ):
         """Train this model on a dataset."""
@@ -538,17 +514,19 @@ class LSTMTrajGAN(TrajectoryModel):
         self.latent_dim = latent_dim
         self.learning_rate = learning_rate
         self.momentum = momentum
-        self.test_size = test_size
         self.patience = patience
         optimizer = optimizers.Adam(learning_rate, momentum)
-        df = self.dataset.to_trajectories(min_points=10)
-        train_set, _ = self.train_test_split(df, test_size=test_size)
+        # Test size is 2 out of 10, valid size is 1 out of remaining 8.
+        test_size = 1 / 5
+        valid_size = 1 / 8
+        train_set, _ = self.dataset.train_test_split(
+            test_size=test_size, min_points=10, min_trajectories=10
+        )
         x, _, _ = self.preprocess(train_set)
         # Train-valid split
         n = x.shape[0]
         idx = np.random.permutation(n)
-        valid_split = 0.1
-        valid_n = np.ceil(n * valid_split).astype(int)
+        valid_n = np.ceil(n * valid_size).astype(int)
         valid_idx, train_idx = idx[:valid_n], idx[valid_n:]
         x_train, x_valid = x[train_idx, :], x[valid_idx, :]
         # build the network

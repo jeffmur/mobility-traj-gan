@@ -18,16 +18,6 @@ class TrajectoryModel(abc.ABC):
     def __init__(self, dataset: Dataset):
         self.dataset = dataset
         self.vocab_sizes = dataset.get_vocab_sizes()
-        self.start_time = None
-        self.end_time = None
-        self.duration = None
-
-    @abc.abstractmethod
-    def train_test_split(
-        self, df: pd.DataFrame, test_size: float = 0.2
-    ) -> Tuple[pd.DataFrame, pd.DataFrame]:
-        """Split the dataset into a train and test set."""
-        raise NotImplementedError
 
     @abc.abstractmethod
     def train(self, optimizer, epochs: int, batch_size: int, **kwargs):

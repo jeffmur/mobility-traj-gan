@@ -1,3 +1,8 @@
+"""foursquare_nyc.py
+
+A dataset class representing the FourSquare NYC dataset
+See: https://sites.google.com/site/yangdingqi/home/foursquare-dataset
+"""
 import os
 from logging import getLogger
 from pathlib import Path

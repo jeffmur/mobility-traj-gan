@@ -3,7 +3,54 @@
 A base class for mobility datasets.
 """
 import abc
+import logging
+from pathlib import Path
 import pandas as pd
+from sklearn.model_selection import StratifiedShuffleSplit
+
+
+from src import config
+
+LOG = logging.getLogger(__name__)
+
+
+def stratified_split(
+    df: pd.DataFrame,
+    label_column: str,
+    trajectory_column: str,
+    test_size: float = 0.2,
+    min_trajectories: int = 10,
+):
+    """Split the dataset into train and test sets, stratifying trajectories by label.
+
+    A stratified split on label to balance label classes across the
+    test and train sets. Random assignment is at the group (trajectory
+    ID) level.  Labels with less than 2 trajectories will be dropped
+    so that each label shows up at least once in each of the train and
+    test sets.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        A pandas DataFrame containing the trajectory data to split.
+    label_column: str
+        The name of the column containing the label to stratify by.
+    trajectory_column: str
+        The name of the column containing the trajectory ID to group assign by.
+    test_size : float
+        The ratio of the data that should be assigned to the test set. Default is 20%.
+    min_trajectories : int
+        The minimum number of trajectories a subject must have in order to be included.
+    """
+    ids = df[[label_column, trajectory_column]].drop_duplicates()
+    ids = ids.groupby("label").filter(lambda x: len(x) >= min_trajectories)
+    split = StratifiedShuffleSplit(test_size=test_size, n_splits=2, random_state=config.SEED).split(
+        ids, ids[label_column]
+    )
+    train_tids, test_tids = next(split)
+    train_set = df[df[trajectory_column].isin(train_tids)]
+    test_set = df[df[trajectory_column].isin(test_tids)]
+    return train_set, test_set
 
 
 class Dataset(abc.ABC):
@@ -91,6 +138,45 @@ class Dataset(abc.ABC):
             .nunique()
             .to_dict()
         )
+
+    def train_test_split(
+        self, test_size: float = 0.2, min_points: int = 10, min_trajectories: int = 10
+    ):
+        """Split the dataset into train and test sets, stratifying trajectories by label.
+
+        A stratified split on label to balance label classes across the
+        test and train sets. Random assignment is at the group (trajectory ID) level.
+
+        Parameters
+        ----------
+        test_size : float
+            The ratio of the data that should be assigned to the test set. Default is 20%.
+        min_points: int
+            The minimum number of points a single trajectory must have in order to be included.
+        min_trajectories : int
+            The minimum number of trajectories a subject must have in order to be included.
+        """
+        train_file = Path(f"data/{str(self)}_train.csv")
+        test_file = Path(f"data/{str(self)}_test.csv")
+        if train_file.exists() and test_file.exists():
+            LOG.info("Reading train set from %s", train_file)
+            LOG.info("Reading test set from %s", test_file)
+            train_set = pd.read_csv(train_file)
+            test_set = pd.read_csv(test_file)
+            return train_set, test_set
+        df = self.to_trajectories(min_points=min_points)
+        train_set, test_set = stratified_split(
+            df,
+            self.label_column,
+            self.trajectory_column,
+            test_size=test_size,
+            min_trajectories=min_trajectories,
+        )
+        LOG.info("Saving train set to %s", train_file)
+        train_set.to_csv(train_file, index=False)
+        LOG.info("Saving test set to %s", test_file)
+        test_set.to_csv(test_file, index=False)
+        return train_set, test_set
 
     def __repr__(self):
         return type(self).__name__

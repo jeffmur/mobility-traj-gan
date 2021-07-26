@@ -45,7 +45,7 @@ def train(model, dataset, epochs):
     """Train MODEL on DATASET stored in DATASET_PATH for EPOCHS."""
     the_dataset = DATASET_CHOICES.get(dataset)()
     the_model = MODEL_CHOICES.get(model)(the_dataset)
-    LOG.info(f"Training model {model} on {dataset} for {epochs} epochs.")
+    LOG.info("Training model %s on %s for %d epochs.", model, dataset, epochs)
     the_model.train(epochs=epochs)
 
 
@@ -62,7 +62,9 @@ def predict(model, saved_path, dataset, output_path):
     the_model = MODEL_CHOICES.get(model).restore(saved_path)
     _, df_test = the_model.train_test_split(the_dataset.to_trajectories())
     the_model.predict(df_test).to_csv(output_path, index=False)
-    LOG.info(f"Model {model} in {saved_path} predictions on {dataset} saved to {output_path}")
+    LOG.info(
+        "Model %s in %s predictions on %s saved to %s", model, saved_path, dataset, output_path
+    )
 
 
 @click.command()
@@ -75,7 +77,7 @@ def evaluate(model, saved_path, dataset):
     the_model = MODEL_CHOICES.get(model).restore(saved_path)
     _, df_test = the_model.train_test_split(the_dataset.to_trajectories())
     metrics = the_model.evaluate(df_test)
-    LOG.info(f"Model {model} in {saved_path} evaluated on {dataset} with metrics {metrics}.")
+    LOG.info("Model %s in %s evaluated on %s with metrics %s.", model, saved_path, dataset, metrics)
 
 
 @click.group()
