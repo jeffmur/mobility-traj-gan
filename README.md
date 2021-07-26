@@ -46,7 +46,7 @@ conda activate
 1. Create a new .py file in [src/models/](src/models/) and write a
    class that inherits from `TrajectoryModel` (in
    [src/models/base.py](src/models/base.py)) and implements at least
-   `train_test_split`, `train`, `predict`, `save` and `restore`
+   `train`, `predict`, `save` and `restore`
    abstract methods. If it's a supervised model (like MARC) then
    you'll also want to add an `evaluate` method to get metrics on the
    test set.
