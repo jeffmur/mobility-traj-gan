@@ -146,9 +146,9 @@ Options:
 - [x] Train LSTM-TrajGAN on GeoLife Beijing dataset
 - [x] Train LSTM-TrajGAN on Privamov Lyon dataset
 - [x] Train MARC on MDC dataset
-- [ ] Train MARC on FourSquare NYC dataset
-- [ ] Train MARC on GeoLife dataset
-- [ ] Train MARC on Privamov dataset
+- [x] Train MARC on FourSquare NYC dataset
+- [x] Train MARC on GeoLife dataset
+- [x] Train MARC on Privamov dataset
 - [ ] Compare MARC performance on real vs. generated MDC trajectories for LSTM-TrajGAN
 - [ ] Get outputs from Yuting's LSTM-AE model on MDC, FourSquare, Privamov and GeoLife datasets
 - [ ] Compare MARC performance on real vs. generated trajectories for LSTM-AE
