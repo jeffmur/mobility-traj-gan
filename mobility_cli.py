@@ -70,14 +70,15 @@ def predict(model, saved_path, dataset, output_path):
 @click.command()
 @click.argument("model", type=click.Choice(MODEL_CHOICES.keys()))
 @click.argument("saved_path", type=click.Path(exists=True, file_okay=False))
-@click.argument("dataset", type=click.Choice(DATASET_CHOICES))
-def evaluate(model, saved_path, dataset):
+@click.argument("data_file", type=click.Path(exists=True))
+def evaluate(model, saved_path, data_file):
     """Use SAVED_MODEL to predict the labels of DATASET."""
-    the_dataset = DATASET_CHOICES.get(dataset)()
     the_model = MODEL_CHOICES.get(model).restore(saved_path)
-    _, df_test = the_dataset.train_test_split()
-    metrics = the_model.evaluate(df_test)
-    LOG.info("Model %s in %s evaluated on %s with metrics %s.", model, saved_path, dataset, metrics)
+    df = pd.read_csv(data_file)
+    metrics = the_model.evaluate(df)
+    LOG.info(
+        "Model %s in %s evaluated on %s with metrics %s.", model, saved_path, data_file, metrics
+    )
 
 
 @click.group()

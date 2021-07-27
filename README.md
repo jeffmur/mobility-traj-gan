@@ -152,3 +152,4 @@ Options:
 - [ ] Compare MARC performance on real vs. generated MDC trajectories for LSTM-TrajGAN
 - [ ] Get outputs from Yuting's LSTM-AE model on MDC, FourSquare, Privamov and GeoLife datasets
 - [ ] Compare MARC performance on real vs. generated trajectories for LSTM-AE
+- [ ] Evaluate realism of generated trajectories using distribution and distance comparisons

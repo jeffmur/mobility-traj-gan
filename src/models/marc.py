@@ -239,7 +239,7 @@ class MARC(TrajectoryModel):
     def evaluate(self, df: pd.DataFrame):
         """Evaluate the model performance on the test set."""
         x, y, _ = self.preprocess(df, train=False)
-        return self.classifier.evaluate(x, y, batch_size=self.batch_size)
+        return self.classifier.evaluate(x, y, batch_size=self.batch_size, return_dict=True)
 
     def save(self, save_path: os.PathLike):
         """Serialize the model to a directory on disk."""
