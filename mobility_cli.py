@@ -60,7 +60,7 @@ def predict(model, saved_path, dataset, output_path):
     os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
     the_dataset = DATASET_CHOICES.get(dataset)()
     the_model = MODEL_CHOICES.get(model).restore(saved_path)
-    _, df_test = the_model.train_test_split(the_dataset.to_trajectories())
+    _, df_test = the_dataset.train_test_split()
     the_model.predict(df_test).to_csv(output_path, index=False)
     LOG.info(
         "Model %s in %s predictions on %s saved to %s", model, saved_path, dataset, output_path
@@ -75,7 +75,7 @@ def evaluate(model, saved_path, dataset):
     """Use SAVED_MODEL to predict the labels of DATASET."""
     the_dataset = DATASET_CHOICES.get(dataset)()
     the_model = MODEL_CHOICES.get(model).restore(saved_path)
-    _, df_test = the_model.train_test_split(the_dataset.to_trajectories())
+    _, df_test = the_dataset.train_test_split()
     metrics = the_model.evaluate(df_test)
     LOG.info("Model %s in %s evaluated on %s with metrics %s.", model, saved_path, dataset, metrics)
 
