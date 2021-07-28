@@ -1,6 +1,7 @@
 ## Temporary Path Storage for simple plug-in-play development
 import os
 import dotenv
+import numpy as np
 
 dotenv.load_dotenv()
 
@@ -8,33 +9,33 @@ dotenv.load_dotenv()
 Dataset Specific Path Locations
 """
 
-GEO_INPUT_DIR = str(os.getenv("GEO_INPUT_DIR"))
+GEO_INPUT_DIR = os.getenv("GEO_INPUT_DIR")
 """
 Note: Used with os.walk which assumes it is a directory (hence no trailing backslash)
 Important: This is the RAW dataset (not santized or preprocessed)
 ex: data/GeoLife/Data/
 """
 
-GEO_INPUT_FILE = str(os.getenv("GEO_INPUT_FILE"))
+GEO_INPUT_FILE = os.getenv("GEO_INPUT_FILE")
 """
 Input data filename, if a single CSV file (not a dir)
 ex: data/geoLife_beijing.csv
 """
 
-MDC_INPUT_DIR = str(os.getenv("MDC_INPUT_DIR"))
-MDC_INPUT_FILE = str(os.getenv("MDC_INPUT_FILE"))
+MDC_INPUT_DIR = os.getenv("MDC_INPUT_DIR")
+MDC_INPUT_FILE = os.getenv("MDC_INPUT_FILE")
 """
 MDC Lausanne
 """
 
-PRV_INPUT_DIR = str(os.getenv("PRV_INPUT_DIR"))
-PRV_INPUT_FILE = str(os.getenv("PRV_INPUT_FILE"))
+PRV_INPUT_DIR = os.getenv("PRV_INPUT_DIR")
+PRV_INPUT_FILE = os.getenv("PRV_INPUT_FILE")
 """
 Privamov Lyon
 """
 
-FSN_INPUT_DIR = str(os.getenv("FSN_INPUT_DIR"))
-FSN_INPUT_FILE = str(os.getenv("FSN_INPUT_FILE"))
+FSN_INPUT_DIR = os.getenv("FSN_INPUT_DIR")
+FSN_INPUT_FILE = os.getenv("FSN_INPUT_FILE")
 """
 Foursquare NYC
 """
@@ -64,4 +65,9 @@ Distance unit conversion constant
 GPS_BB = os.getenv("GPS_BB")
 """
 Path to the file with raw GPS coordinates but filtered to bounding box region
+"""
+
+SEED = 11
+"""
+Random number generator seed
 """

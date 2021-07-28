@@ -1,5 +1,10 @@
+"""foursquare_nyc.py
+
+A dataset class representing the FourSquare NYC dataset
+See: https://sites.google.com/site/yangdingqi/home/foursquare-dataset
+"""
 import os
-from logging import Logger
+from logging import getLogger
 from pathlib import Path
 
 import pandas as pd
@@ -8,7 +13,7 @@ from sklearn.preprocessing import OrdinalEncoder
 from src.datasets import Dataset
 from src import config
 
-LOG = Logger(__name__)
+LOG = getLogger(__name__)
 
 
 class FourSquareNYC(Dataset):
@@ -55,7 +60,7 @@ class FourSquareNYC(Dataset):
         LOG.info("Preprocessed data written to: %s", self.processed_file)
         return df
 
-    def to_trajectories(self, min_points=2, *args):
+    def to_trajectories(self, *args, min_points=2):
         """Return the dataset as a Pandas DataFrame split into user-week trajectories.
 
         Multiple points within a ten minute interval will be removed.
@@ -68,4 +73,4 @@ class FourSquareNYC(Dataset):
         args : str
             The names of any extra categorical columns to pass through.
         """
-        return super().to_trajectories(min_points, "category", *args)
+        return super().to_trajectories(*args, min_points=min_points)

@@ -3,11 +3,12 @@
 Base classes for models.
 """
 import abc
-from datetime import datetime
 import logging
 import os
-from typing import Dict, Any
+from datetime import datetime
+from typing import Any, Dict, Tuple
 
+import pandas as pd
 from src.datasets import Dataset
 
 
@@ -17,13 +18,15 @@ class TrajectoryModel(abc.ABC):
     def __init__(self, dataset: Dataset):
         self.dataset = dataset
         self.vocab_sizes = dataset.get_vocab_sizes()
-        self.start_time = None
-        self.end_time = None
-        self.duration = None
 
     @abc.abstractmethod
     def train(self, optimizer, epochs: int, batch_size: int, **kwargs):
         """Train the model."""
+        raise NotImplementedError
+
+    @abc.abstractmethod
+    def predict(self, df: pd.DataFrame):
+        """Use the model to predict (or generate) given new input data."""
         raise NotImplementedError
 
     @abc.abstractmethod

@@ -3,14 +3,14 @@
 The MDC dataset filtered to the city limits of Lausanne, CH.
 """
 import os
-from logging import Logger
+from logging import getLogger
 from pathlib import Path
 
 import pandas as pd
 from src import config, freq_matrix, preprocess
 from src.datasets.base import Dataset
 
-LOG = Logger(__name__)
+LOG = getLogger(__name__)
 
 
 class MDCLausanne(Dataset):

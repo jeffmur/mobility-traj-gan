@@ -3,26 +3,24 @@
 TensorFlow 2 reimplementation of the Multi-Aspect Trajectory Classifier model
 from: https://github.com/bigdata-ufsc/petry-2020-marc
 """
-import joblib
-import logging
+from logging import getLogger
 import os
 from pathlib import Path
 
+import joblib
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import StratifiedShuffleSplit
 from sklearn.preprocessing import OneHotEncoder, OrdinalEncoder
 from tensorflow.keras import Model, callbacks, initializers, layers, optimizers, regularizers
 from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 
-from src.datasets import Dataset
+from src import config
+from src.datasets import Dataset, stratified_split
 from src.models.base import TrajectoryModel, log_end, log_start
 from src.processors import GPSGeoHasher
 
-LOG = logging.Logger(__name__)
-LOG.setLevel(logging.DEBUG)
-SEED = 11
+LOG = getLogger(__name__)
 
 
 def build_classifier(
@@ -82,12 +80,11 @@ class MARC(TrajectoryModel):
     """
 
     def __init__(self, dataset: Dataset, geohash_precision: int = 8):
-        self.dataset = dataset
+        super().__init__(dataset)
         self.geohasher = GPSGeoHasher(precision=geohash_precision)
         self.geohash_dim = geohash_precision * 5
         self.y_encoder = OneHotEncoder(sparse=False, handle_unknown="ignore")
         self.encoders = []
-        self.vocab_sizes = None
         self.timesteps = None
         self.num_classes = None
         self.learning_rate = None
@@ -95,29 +92,7 @@ class MARC(TrajectoryModel):
         self.batch_size = None
         self.patience = None
         self.classifier = None
-        self.test_size = None
         self.trained_epochs = 0
-
-    def train_test_split(self, df: pd.DataFrame, test_size: float = 0.2):
-        """Split the dataset into train and test sets.
-
-        Use a stratified split on label to balance label classes across the
-        test and train sets.
-
-        Parameters
-        ----------
-        test_size : float
-            The ratio of the data that should be assigned to the test set.
-        """
-        ids = df[[self.dataset.label_column, self.dataset.trajectory_column]].drop_duplicates()
-        ids = ids.groupby("label").filter(lambda x: len(x) > 1)
-        split = StratifiedShuffleSplit(test_size=test_size, n_splits=2, random_state=SEED).split(
-            ids, ids[self.dataset.label_column]
-        )
-        train_tids, test_tids = next(split)
-        train_set = df[df[self.dataset.trajectory_column].isin(train_tids)]
-        test_set = df[df[self.dataset.trajectory_column].isin(test_tids)]
-        return train_set, test_set
 
     def preprocess(
         self,
@@ -195,24 +170,32 @@ class MARC(TrajectoryModel):
         batch_size: int = 64,
         learning_rate: float = 0.001,
         momentum: float = 0.9,
-        test_size: float = 0.2,
         patience: int = 10,
     ):
         """Train this model on the dataset."""
         self.batch_size = batch_size
         self.learning_rate = learning_rate
         self.momentum = momentum
-        self.test_size = test_size
         self.patience = patience
         exp_name = f"{type(self).__name__}_{type(self.dataset).__name__}"
         start_time = log_start(LOG, exp_name, batch_size=batch_size)
         start_time_str = start_time.strftime("%Y-%m-%dT%H:%M:%S")
         exp_path = Path(f"experiments/{exp_name}/{start_time_str}")
-        self.test_size = test_size
         optimizer = optimizers.Adam(learning_rate, momentum)
-        df = self.dataset.to_trajectories(min_points=10)
-        train_set, _ = self.train_test_split(df, test_size=test_size)
-        train_set, valid_set = self.train_test_split(train_set, test_size=0.1)
+        # Test size is 2 out of 10, valid size is 1 out of remaining 8.
+        test_size = 1 / 5
+        valid_size = 1 / 8
+        train_set, _ = self.dataset.train_test_split(
+            test_size=test_size, min_points=10, min_trajectories=10
+        )
+        # Do the same stratified train/test split again to get a validation set.
+        train_set, valid_set = stratified_split(
+            train_set,
+            self.dataset.label_column,
+            self.dataset.trajectory_column,
+            test_size=valid_size,
+            min_trajectories=8,
+        )
         x_train, y_train, _ = self.preprocess(train_set)
         x_val, y_val, _ = self.preprocess(valid_set, train=False)
         self.classifier = build_classifier(
@@ -248,11 +231,15 @@ class MARC(TrajectoryModel):
         self.save(f"{exp_path}/saved_model")
         return history
 
+    def predict(self, df: pd.DataFrame):
+        """Predict the labels of a dataset."""
+        x, _, _ = self.preprocess(df, train=False)
+        return self.classifier.predict(x, batch_size=self.batch_size)
+
     def evaluate(self, df: pd.DataFrame):
         """Evaluate the model performance on the test set."""
-        _, test_set = self.train_test_split(df, test_size=self.test_size)
-        x_test, y_test, _ = self.preprocess(test_set, train=False)
-        return self.classifier.evaluate(x=x_test, y=y_test, batch_size=self.batch_size)
+        x, y, _ = self.preprocess(df, train=False)
+        return self.classifier.evaluate(x, y, batch_size=self.batch_size, return_dict=True)
 
     def save(self, save_path: os.PathLike):
         """Serialize the model to a directory on disk."""
@@ -276,7 +263,6 @@ class MARC(TrajectoryModel):
                 timesteps=self.timesteps,
                 vocab_sizes=self.vocab_sizes,
                 num_classes=self.num_classes,
-                test_size=self.test_size,
             )
             joblib.dump(train_state, save_path / "train_state.pkl")
         joblib.dump(hparams, save_path / "hparams.pkl")

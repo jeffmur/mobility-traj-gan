@@ -3,13 +3,13 @@ GAN model
 Rewrite of LSTM-TrajGAN for TF2
 """
 import csv
-import logging
+from logging import getLogger
 import os
-import joblib
 from datetime import datetime
 from pathlib import Path
 from typing import Dict
 
+import joblib
 import numpy as np
 import pandas as pd
 import tensorflow as tf
@@ -21,13 +21,12 @@ from tensorflow.keras import initializers, layers, optimizers, regularizers
 from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing.sequence import pad_sequences
 
-from src.models.base import TrajectoryModel, log_start, log_end
+from src import config
 from src.datasets import Dataset
+from src.models.base import TrajectoryModel, log_end, log_start
 from src.processors import GPSNormalizer
 
-SEED = 11
-LOG = logging.Logger(__name__)
-LOG.setLevel(logging.DEBUG)
+LOG = getLogger(__name__)
 
 # Masked Loss from LSTM-TrajGAN
 def traj_loss(real_traj, gen_traj, mask, latlon_weight=10.0):
@@ -76,7 +75,7 @@ def build_inputs_latlon(timesteps: int, dense_units: int):
         units=dense_units,
         activation="relu",
         use_bias=True,
-        kernel_initializer=initializers.he_uniform(seed=SEED),
+        kernel_initializer=initializers.he_uniform(seed=config.SEED),
         name="embed_latlon",
     )
     dense_latlon = [d(x) for x in unstacked]
@@ -92,7 +91,7 @@ def build_inputs_cat(timesteps, levels, feature_name):
         units=levels,
         activation="relu",
         use_bias=True,
-        kernel_initializer=initializers.he_uniform(seed=SEED),
+        kernel_initializer=initializers.he_uniform(seed=config.SEED),
         name="emb_" + feature_name,
     )
     dense_attr = [d(x) for x in unstacked]
@@ -402,8 +401,7 @@ class LSTMTrajGAN(TrajectoryModel):
     """
 
     def __init__(self, dataset: Dataset):
-        self.dataset = dataset
-        self.vocab_sizes = dataset.get_vocab_sizes()
+        super().__init__(dataset)
         self.gps_normalizer = GPSNormalizer()
         self.encoders = []
         self.timesteps = None
@@ -411,33 +409,11 @@ class LSTMTrajGAN(TrajectoryModel):
         self.momentum = None
         self.latent_dim = None
         self.batch_size = None
-        self.test_size = None
         self.patience = None
         self.gen = None
         self.dis = None
         self.gan = None
         self.trained_epochs = 0
-
-    def train_test_split(self, df: pd.DataFrame, test_size: float = 0.2):
-        """Split the dataset into train and test sets.
-
-        Use a group shuffle split to assign each trajectory to either
-        the train set or the test set.
-
-        Parameters
-        ----------
-        test_size : float
-            The ratio of the data that should be assigned to the test set.
-        """
-        train_inds, test_inds = next(
-            GroupShuffleSplit(test_size=test_size, n_splits=2, random_state=SEED).split(
-                df, groups=df[self.dataset.trajectory_column]
-            )
-        )
-
-        train_set = df.iloc[train_inds]
-        test_set = df.iloc[test_inds]
-        return train_set, test_set
 
     def preprocess(
         self,
@@ -531,7 +507,6 @@ class LSTMTrajGAN(TrajectoryModel):
         latent_dim: int = 100,
         learning_rate: float = 0.001,
         momentum: float = 0.5,
-        test_size: float = 0.2,
         patience: int = 10,
     ):
         """Train this model on a dataset."""
@@ -539,17 +514,19 @@ class LSTMTrajGAN(TrajectoryModel):
         self.latent_dim = latent_dim
         self.learning_rate = learning_rate
         self.momentum = momentum
-        self.test_size = test_size
         self.patience = patience
         optimizer = optimizers.Adam(learning_rate, momentum)
-        df = self.dataset.to_trajectories(min_points=10)
-        train_set, _ = self.train_test_split(df, test_size=test_size)
+        # Test size is 2 out of 10, valid size is 1 out of remaining 8.
+        test_size = 1 / 5
+        valid_size = 1 / 8
+        train_set, _ = self.dataset.train_test_split(
+            test_size=test_size, min_points=10, min_trajectories=10
+        )
         x, _, _ = self.preprocess(train_set)
         # Train-valid split
         n = x.shape[0]
         idx = np.random.permutation(n)
-        valid_split = 0.1
-        valid_n = np.ceil(n * valid_split).astype(int)
+        valid_n = np.ceil(n * valid_size).astype(int)
         valid_idx, train_idx = idx[:valid_n], idx[valid_n:]
         x_train, x_valid = x[train_idx, :], x[valid_idx, :]
         # build the network
