@@ -1,10 +1,9 @@
 # Traj-GAN applied to CDR
 
 ## Purpose
+Privacy Preserving Framework to anonymize user trajectories contained in a population of users. It allows for researchers and engineers to plug-in any dataset & model into our current system. 
 
-Processing mobile GPS location time series data with an LSTM Autoencoder network
-to discover user communities through trajectory clustering, in a federated
-environment with privacy preservation.
+Processing GPS location time series data with a Trajectory Generative Adversarial Network to generate synthetic data. 
 
 ## How-to...
 
