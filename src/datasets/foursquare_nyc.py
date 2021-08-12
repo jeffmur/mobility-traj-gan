@@ -60,7 +60,7 @@ class FourSquareNYC(Dataset):
         LOG.info("Preprocessed data written to: %s", self.processed_file)
         return df
 
-    def to_trajectories(self, *args, min_points=2):
+    def to_trajectories(self, *args, min_points=2, resolution="10min"):
         """Return the dataset as a Pandas DataFrame split into user-week trajectories.
 
         Multiple points within a ten minute interval will be removed.
@@ -73,4 +73,4 @@ class FourSquareNYC(Dataset):
         args : str
             The names of any extra categorical columns to pass through.
         """
-        return super().to_trajectories(*args, min_points=min_points)
+        return super().to_trajectories(*args, min_points=min_points, resolution=resolution)
