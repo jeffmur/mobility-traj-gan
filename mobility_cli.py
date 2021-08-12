@@ -41,12 +41,15 @@ def set_seeds(seed):
 @click.argument("model", type=click.Choice(MODEL_CHOICES.keys()))
 @click.argument("dataset", type=click.Choice(DATASET_CHOICES.keys()))
 @click.argument("epochs", type=click.INT)
-def train(model, dataset, epochs):
+@click.option(
+    "--resolution", type=click.STRING, help="Time resolution as a Pandas frequency string."
+)
+def train(model, dataset, epochs, resolution):
     """Train MODEL on DATASET stored in DATASET_PATH for EPOCHS."""
     the_dataset = DATASET_CHOICES.get(dataset)()
     the_model = MODEL_CHOICES.get(model)(the_dataset)
     LOG.info("Training model %s on %s for %d epochs.", model, dataset, epochs)
-    the_model.train(epochs=epochs)
+    the_model.train(epochs=epochs, resolution=resolution)
 
 
 @click.command()

@@ -67,10 +67,14 @@ class Dataset(abc.ABC):
         """Preprocess the raw data."""
         raise NotImplementedError()
 
-    def to_trajectories(self, *args, min_points: int = 2) -> pd.DataFrame:
+    def to_trajectories(
+        self, *args, min_points: int = 2, resolution: str = "10min"
+    ) -> pd.DataFrame:
         """Return the dataset as a Pandas DataFrame split into user-week trajectories.
 
-        Multiple points within a ten minute interval will be removed.
+        Multiple points within a `resolution` time interval will be removed (default 10 minutes).
+        See https://pandas.pydata.org/docs/user_guide/timeseries.html#timeseries-offset-aliases
+        for possible values.
 
         Parameters
         ----------
@@ -90,7 +94,7 @@ class Dataset(abc.ABC):
         df["hour"] = df[self.datetime_column].dt.hour
         df["minute"] = df[self.datetime_column].dt.minute
         df["week"] = df[self.datetime_column].dt.isocalendar().week
-        df["tenminute"] = (df[self.datetime_column].dt.minute // 10 * 10).astype(int)
+        df["timestep"] = (df[self.datetime_column].dt.floor(resolution)).astype(int)
         df = (
             df.groupby(
                 [
@@ -101,7 +105,7 @@ class Dataset(abc.ABC):
                     "day",
                     "weekday",
                     "hour",
-                    "tenminute",
+                    "timestep",
                     *args,
                 ]
             )
@@ -140,7 +144,11 @@ class Dataset(abc.ABC):
         )
 
     def train_test_split(
-        self, test_size: float = 0.2, min_points: int = 10, min_trajectories: int = 10
+        self,
+        test_size: float = 0.2,
+        min_points: int = 10,
+        resolution: str = "10min",
+        min_trajectories: int = 10,
     ):
         """Split the dataset into train and test sets, stratifying trajectories by label.
 
@@ -164,7 +172,7 @@ class Dataset(abc.ABC):
             train_set = pd.read_csv(train_file)
             test_set = pd.read_csv(test_file)
             return train_set, test_set
-        df = self.to_trajectories(min_points=min_points)
+        df = self.to_trajectories(min_points=min_points, resolution=resolution)
         train_set, test_set = stratified_split(
             df,
             self.label_column,

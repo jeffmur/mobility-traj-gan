@@ -508,6 +508,7 @@ class LSTMTrajGAN(TrajectoryModel):
         learning_rate: float = 0.001,
         momentum: float = 0.5,
         patience: int = 10,
+        resolution: str = "10min",
     ):
         """Train this model on a dataset."""
         self.batch_size = batch_size
@@ -520,7 +521,7 @@ class LSTMTrajGAN(TrajectoryModel):
         test_size = 1 / 5
         valid_size = 1 / 8
         train_set, _ = self.dataset.train_test_split(
-            test_size=test_size, min_points=10, min_trajectories=10
+            test_size=test_size, min_points=10, min_trajectories=10, resolution=resolution
         )
         x, _, _ = self.preprocess(train_set)
         # Train-valid split
@@ -533,7 +534,7 @@ class LSTMTrajGAN(TrajectoryModel):
         self.gen, self.dis, self.gan = build_gan(optimizer, self.timesteps, self.vocab_sizes)
         exp_name = f"{type(self).__name__}_{type(self.dataset).__name__}"
         hparams = dict(epochs=epochs, batch_size=batch_size, latent_dim=latent_dim)
-        start_time = log_start(LOG, exp_name, **hparams)
+        start_time = log_start(LOG, exp_name, **hparams, resolution=resolution)
         start_time_str = start_time.strftime("%Y-%m-%dT%H:%M:%S")
         exp_path = Path(f"experiments/{exp_name}/{start_time_str}")
         train_model(
