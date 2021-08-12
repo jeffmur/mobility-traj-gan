@@ -57,13 +57,16 @@ def train(model, dataset, epochs, resolution):
 @click.argument("saved_path", type=click.Path(exists=True, file_okay=False))
 @click.argument("dataset", type=click.Choice(DATASET_CHOICES))
 @click.argument("output_path", type=click.Path(dir_okay=False))
-def predict(model, saved_path, dataset, output_path):
+@click.option(
+    "--resolution", type=click.STRING, help="Time resolution as a Pandas frequency string."
+)
+def predict(model, saved_path, dataset, output_path, resolution):
     """Use trained MODEL saved in SAVED_PATH to make predictions based on DATASET
     and write to OUTPUT_PATH as CSV."""
     os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
     the_dataset = DATASET_CHOICES.get(dataset)()
     the_model = MODEL_CHOICES.get(model).restore(saved_path)
-    _, df_test = the_dataset.train_test_split()
+    _, df_test = the_dataset.train_test_split(resolution=resolution)
     the_model.predict(df_test).to_csv(output_path, index=False)
     LOG.info(
         "Model %s in %s predictions on %s saved to %s", model, saved_path, dataset, output_path
