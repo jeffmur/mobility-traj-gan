@@ -164,8 +164,8 @@ class Dataset(abc.ABC):
         min_trajectories : int
             The minimum number of trajectories a subject must have in order to be included.
         """
-        train_file = Path(f"data/{str(self)}_train.csv")
-        test_file = Path(f"data/{str(self)}_test.csv")
+        train_file = Path(f"data/{str(self)}_{resolution}_train.csv")
+        test_file = Path(f"data/{str(self)}_{resolution}_test.csv")
         if train_file.exists() and test_file.exists():
             LOG.info("Reading train set from %s", train_file)
             LOG.info("Reading test set from %s", test_file)
